@@ -1,66 +1,55 @@
 #include "find_hosts.hpp"
 
-#include <libnet.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/if_ether.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
 #include <pcap.h>
 
-#include <netinet/ip.h>
-#include <netinet/if_ether.h>
 #include <string>
 #include <iostream>
 #include <thread>
 #include <chrono>
 #include <vector>
 
-void ping_broadcast(char *broadcast_address) {
-	printf("Attempting to send ping request to broadcast address.\n");
+bool ping_broadcast() {
+	struct sockaddr_in addr; // The address that we are pinging.
 
-	// Default broadcast address
-	if (broadcast_address == NULL) broadcast_address = "192.168.1.255"; 
+	memset(&addr, 0, sizeof addr);
+	addr.sin_family = AF_INET;
 
-	char error_buffer[LIBNET_ERRBUF_SIZE];
-	libnet_t *libnet_ctx = libnet_init(LIBNET_RAW4, NULL, error_buffer);
-	if (libnet_ctx == NULL) {
-		fprintf(stderr, "libnet_init failed: %s", error_buffer);
-		exit(EXIT_FAILURE);
+	char *broadcast_ip = "192.168.1.211";
+	if (inet_aton(broadcast_ip, &addr.sin_addr) == 0) {
+		perror("inet_aton");
+		printf("%s isn't a valid IP address.\n", broadcast_ip);
+		return false;
 	}
 
-	// Generate a random ID
-	libnet_seed_prand(libnet_ctx);
-	u_int16_t id = (u_int16_t)libnet_get_prand(LIBNET_PR16);
-
-	u_int32_t ip_addr = libnet_name2addr4(libnet_ctx, broadcast_address, LIBNET_DONT_RESOLVE);
-
-	if (ip_addr == -1) {
-		fprintf(stderr, "libnet_name2addr4 failed: %s", error_buffer);
-		libnet_destroy(libnet_ctx);
-		exit(EXIT_FAILURE);
+	int sock_fd = socket(PF_INET, SOCK_RAW, IPPROTO_ICMP);
+	if (sock_fd < 0) {
+		perror("socket");
+		return false;
 	}
 
-	// Building ICMP header
-	u_int16_t seq = 1;
-	if (libnet_build_icmpv4_echo(ICMP_ECHO, 0, 0, id, seq, NULL, 0, libnet_ctx, 0) == -1) {
-		fprintf(stderr, "libnet_build_icmpv4_echo: %s", error_buffer);
-		libnet_destroy(libnet_ctx);
-		exit(EXIT_FAILURE);
-	}
+	const int ttl = 20; // The time to live of the packet, in our case the packet is going to the LAN router.
+	if (setsockopt(sock_fd, IPPROTO_IP, IP_TTL, &ttl, sizeof ttl) != 0)
+		perror("setsockopt");
+	if (fcntl(sock_fd, F_SETFL, O_NONBLOCK) != 0)
+		perror("fcntl");
 
-	// Building IP header
-	if (libnet_autobuild_ipv4(LIBNET_IPV4_H + LIBNET_ICMPV4_ECHO_H, IPPROTO_ICMP, ip_addr, libnet_ctx) == -1) {
-		fprintf(stderr, "libnet_autobuild_ipv4_echo: %s", error_buffer);
-		libnet_destroy(libnet_ctx);
-		exit(EXIT_FAILURE);
-	}
+	struct icmp *icmp_send;
+	icmp_send->icmp_type = ICMP_ECHO;
+	icmp_send->icmp_code = 0;
 
-	// Writing packet
-	int bytes_written = libnet_write(libnet_ctx);
-	if (bytes_written != -1) {
-		printf("%d bytes written.\n", bytes_written);
-	} else {
-		fprintf(stderr, "Error writing packet: %s\n", libnet_geterror(libnet_ctx));
+	// Set a breakpoint and cross reference the raw bits
+	if (sendto(sock_fd, icmp_send, sizeof icmp_send, 0, (struct sockaddr *)&addr, sizeof addr) <= 0) {
+		perror("sendto: ");
+		return false;
 	}
-
-	libnet_destroy(libnet_ctx);
-	printf("Sucessfully sent ping request to broadcast address.\n");
 }
 
 void dump(const unsigned char *data_buffer, const unsigned int length) {
@@ -86,15 +75,15 @@ void dump(const unsigned char *data_buffer, const unsigned int length) {
 	return;
 }
 
-void process_ether_header(struct ethhdr *h) {
-	u_char *ptr = h->h_dest;
+void process_ether_header(struct ether_header *h) {
+	u_char *ptr = h->ether_dhost;
 	int i = ETHER_ADDR_LEN;
 	printf("Destination Address: ");
 	do {
 		printf("%s%x", (i == ETHER_ADDR_LEN) ? " " : ":", *ptr++);
 	} while (--i > 0);
 	printf(" Source Address: ");
-	ptr = h->h_source;
+	ptr = h->ether_shost;
 	i = ETHER_ADDR_LEN;
 	printf("Source Address: ");
 	do {
@@ -103,9 +92,9 @@ void process_ether_header(struct ethhdr *h) {
 	printf("\n");
 }
 
-std::string get_source_address_from_ipv4(struct iphdr *h) {
+std::string get_source_address_from_ipv4(struct ip *h) {
 	struct sockaddr_in ip;
-	ip.sin_addr.s_addr = h->saddr;
+	ip.sin_addr = h->ip_src;
 	char *address = inet_ntoa(ip.sin_addr);
 	return std::string(address);
 }
@@ -142,7 +131,7 @@ std::vector<int> connect_to_nodes() {
 		exit(EXIT_FAILURE);
 	}
 
-	ping_broadcast(NULL);
+	ping_broadcast();
 
   // Read the packets for one minute
 	std::vector<int> node_fds;
@@ -150,7 +139,8 @@ std::vector<int> connect_to_nodes() {
 	do {
 		pcap_pkthdr header;
 		const u_char* packet = pcap_next(pcap_handle, &header);
-		std::string address = get_source_address_from_ipv4((struct iphdr *)(packet + sizeof(struct ethhdr)));
+		printf("%d", sizeof(struct ether_header));
+		std::string address = get_source_address_from_ipv4((struct ip *)(packet + sizeof(struct ether_header)));
 		std::cout << "Found address: " << address << ". Attempting to connect..." << std::endl;
 		node_fds.push_back(connect_to_node(address, 3390));
 	} while (std::chrono::system_clock::now() < finish);

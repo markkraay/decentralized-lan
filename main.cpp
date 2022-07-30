@@ -1,18 +1,22 @@
 #include "find_hosts.hpp"
 #include "node.hpp"
 
-#include <nlohmann/json.hpp>
+// #include <nlohmann/json.hpp>
 
 #include <fstream>
 #include <set>
 #include <string>
 #include <vector>
 
-using json = nlohmann::json;
+// using json = nlohmann::json;
 
 int main() {
 	Node node = Node();
 	node.start();
+
+	// ping_broadcast(NULL);
+	// Node node = Node();
+	// node.start();
 
 	// ping_broadcast(NULL);
 	// std::vector<int> ips = connect_to_nodes();

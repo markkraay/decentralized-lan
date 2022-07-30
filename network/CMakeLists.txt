@@ -2,10 +2,10 @@ project (Network)
 
 file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
-add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
+add_library(${PROJECT_NAME} STATIC ${SRC_FILES})
 
 find_path(LIBNET_INCLUDE_DIR libnet.h
-	/usr/include
+	/usr/local/Cellar/libnet/1.2/include
 )
 
 find_path(LIBPCAP_INCLUDE_DIR pcap.h
@@ -38,6 +38,6 @@ endif()
 
 target_include_directories(${PROJECT_NAME}
 	PUBLIC ${PROJECT_SOURCE_DIR}/include
-	LIBNET_INCLUDE_DIR
-	LIBPCAP_INCLUDE_DIR
+	${LIBNET_INCLUDE_DIR}
+	${LIBPCAP_INCLUDE_DIR}
 )
