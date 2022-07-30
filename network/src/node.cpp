@@ -1,6 +1,7 @@
 #include "node.hpp"
 
-#include "find_hosts.hpp"
+#include "lan.hpp"
+#include "network_utils.hpp"
 
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -23,28 +24,28 @@ joins the network, making itself available to other
 nodes so that they to can connect to the node.
 */
 void Node::start() {
-	// Creating socket file descriptor
+	// Creating TCP socket for communication with other nodes
 	if ((this->node_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-		perror("socket creation failed: ");
+		perror("Creation of server socket failed: ");
 		exit(EXIT_FAILURE);
 	}
 
 	// Allow socket descriptors to be reusable
 	int on = 1;
 	if (setsockopt(this->node_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) < 0) {
-		perror("setsockopt failed ");
+		perror("setsockopt SO_REUSEADDR failed: ");
 		close(this->node_fd);
 		exit(EXIT_FAILURE);
 	}
 
 	struct sockaddr_in node_address;
 	node_address.sin_family = AF_INET;
-	node_address.sin_addr.s_addr = htonl(INADDR_ANY);
+	node_address.sin_addr.s_addr = htonl(INADDR_ANY); // Use the default LAN IPv4 address
 	node_address.sin_port = htons(PORT);
 	memset(node_address.sin_zero, '\0', sizeof(node_address.sin_zero));
 
 	if (bind(this->node_fd, (struct sockaddr *)&node_address, sizeof(node_address)) < 0) {
-		perror("bind failed: ");
+		perror("binding socket failed: ");
 		close(this->node_fd);
 		exit(EXIT_FAILURE);
 	}
@@ -64,10 +65,11 @@ void Node::start() {
 
 	//  Try to connect to other node's on the network
 	int clients = 1; // The current number of clients (one because the server node)
-	std::vector<int> nodes = connect_to_nodes();
-	for (clients; clients < nodes.size(); clients++) {
-		pollfds[clients].fd = nodes[clients - 1];
+	std::set<int> nodes = lan::connect_to_nodes();
+	for (int node : nodes) {
+		pollfds[clients].fd = node;
 		pollfds[clients].events = POLLIN | POLLPRI;
+		clients++;
 	}
 
 	char buffer[SOCKET_BUFFER_SIZE]; // For reading messages from the nodes
@@ -120,5 +122,6 @@ from the network, closing socket connections with the other
 nodes.
 */
 void Node::terminate() {
+	// Close the connections
 
 }
