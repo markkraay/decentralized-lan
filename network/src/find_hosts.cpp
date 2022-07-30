@@ -16,13 +16,36 @@
 #include <chrono>
 #include <vector>
 
+uint16_t checksum(uint16_t *icmph, int len) {
+	uint16_t ret = 0;
+	uint32_t sum = 0;
+	uint16_t odd_byte;
+	
+	while (len > 1) {
+		sum += *icmph++;
+		len -= 2;
+	}
+	
+	if (len == 1) {
+		*(uint8_t*)(&odd_byte) = * (uint8_t*)icmph;
+		sum += odd_byte;
+	}
+	
+	sum =  (sum >> 16) + (sum & 0xffff);
+	sum += (sum >> 16);
+	ret =  ~sum;
+	
+	return ret; 
+}
+
 bool ping_broadcast() {
 	struct sockaddr_in addr; // The address that we are pinging.
+	const int on = 1;
 
 	memset(&addr, 0, sizeof addr);
 	addr.sin_family = AF_INET;
 
-	char *broadcast_ip = "192.168.1.211";
+	char *broadcast_ip = "192.168.1.255";
 	if (inet_aton(broadcast_ip, &addr.sin_addr) == 0) {
 		perror("inet_aton");
 		printf("%s isn't a valid IP address.\n", broadcast_ip);
@@ -35,18 +58,23 @@ bool ping_broadcast() {
 		return false;
 	}
 
-	const int ttl = 20; // The time to live of the packet, in our case the packet is going to the LAN router.
-	if (setsockopt(sock_fd, IPPROTO_IP, IP_TTL, &ttl, sizeof ttl) != 0)
-		perror("setsockopt");
-	if (fcntl(sock_fd, F_SETFL, O_NONBLOCK) != 0)
-		perror("fcntl");
+	if (setsockopt(sock_fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof on) != 0)
+		perror("setsocketopt");
 
-	struct icmp *icmp_send;
-	icmp_send->icmp_type = ICMP_ECHO;
-	icmp_send->icmp_code = 0;
+#ifdef __APPLE__
+	struct icmp icmp_header;
+
+#elif __linux
+	struct icmphdr icmp_header;
+	memset(&icmp_header, '0', sizeof icmp_header);
+	icmp_header.type = ICMP_ECHO;
+	icmp_header.code = 0;
+	icmp_header.checksum = 0;
+	icmp_header.checksum = checksum((u_int16_t *)&icmp_header, sizeof icmp_header);
+#endif
 
 	// Set a breakpoint and cross reference the raw bits
-	if (sendto(sock_fd, icmp_send, sizeof icmp_send, 0, (struct sockaddr *)&addr, sizeof addr) <= 0) {
+	if (sendto(sock_fd, &icmp_header, sizeof icmp_header, 0, (struct sockaddr *)&addr, sizeof addr) <= 0) {
 		perror("sendto: ");
 		return false;
 	}
