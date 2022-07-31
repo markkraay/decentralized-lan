@@ -89,7 +89,7 @@ is assumed to be an ICMP response to the ping's request, so we
 decode the ICMP packet to yield the source IP of the packet and 
 attempt a connection on the address.
 */
-std::vector<int> lan::connect_to_nodes() {
+std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
 	char error_buffer[PCAP_ERRBUF_SIZE];
 
 	// Get the default ethernet device
@@ -140,7 +140,7 @@ std::vector<int> lan::connect_to_nodes() {
 		if (system_clock::now() > next_broadcast) {
 			bool ping_success = ping_broadcast();
 			std::cout << std::put_time(std::localtime(&now), "%F %T") << " Pinging Broadcast: " << (ping_success ? "Success" : "Failed") << std::endl;
-			next_broadcast = system_clock::now() + seconds(5);
+			next_broadcast = system_clock::now() + seconds(timeout_seconds / 3); // Will perform three broadcasts
 		} else {
 			pcap_pkthdr header;
 			const u_char* packet = pcap_next(pcap_handle, &header);
@@ -161,7 +161,7 @@ std::vector<int> lan::connect_to_nodes() {
 				}
 			}
 		}
-	} while (system_clock::now() < start + seconds(100));
+	} while (system_clock::now() < start + seconds(timeout_seconds));
 
 	std::cout << "Finished" << std::endl;
 
@@ -180,7 +180,7 @@ int lan::connect_to_node(const std::string& node_ip) {
 	}
 
 	struct timeval timeout;
-	timeout.tv_sec = 20; // Timeout length in seconds
+	timeout.tv_sec = 10; // Timeout length in seconds
 	timeout.tv_usec = 0;
 	setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
