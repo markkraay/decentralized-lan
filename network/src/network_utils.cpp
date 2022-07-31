@@ -2,9 +2,13 @@
 
 #include <arpa/inet.h>
 
-std::string network_utils::get_source_address_from_ipv4(struct iphdr *h) {
+std::string network_utils::get_source_address_from_ipv4(ip_header *h) {
 	struct sockaddr_in ip;
+#ifdef __APPLE__
+	ip.sin_addr = h->ip_src;
+#elif __linux
 	ip.sin_addr.s_addr = h->saddr;
+#endif
 	char *address = inet_ntoa(ip.sin_addr);
 	return std::string(address);
 }

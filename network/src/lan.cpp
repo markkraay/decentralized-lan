@@ -56,6 +56,12 @@ bool lan::ping_broadcast() {
 	}
 
 #ifdef __APPLE__
+	struct icmp icmp_header;
+	memset(&icmp_header, '0', sizeof icmp_header);
+	icmp_header.icmp_type = ICMP_ECHO;
+	icmp_header.icmp_code = 0;
+	icmp_header.icmp_cksum = 0;
+	icmp_header.icmp_cksum = network_utils::icmp_checksum((u_int16_t *)&icmp_header, sizeof icmp_header);
 #elif __linux
 	struct icmphdr icmp_header;
 	memset(&icmp_header, '0', sizeof icmp_header);
@@ -140,7 +146,7 @@ std::vector<int> lan::connect_to_nodes() {
 			const u_char* packet = pcap_next(pcap_handle, &header);
 			// Get the IP address from the packet
 			if (packet != NULL) {
-				std::string address = network_utils::get_source_address_from_ipv4((struct iphdr *)(packet + sizeof(struct ether_header)));
+				std::string address = network_utils::get_source_address_from_ipv4((ip_header *)(packet + sizeof(struct ether_header)));
 				if (address_fd.find(address) == address_fd.end()) { 
 					std::cout << "Found address: " << address << ". Attempting to connect... " << std::endl;
 					// Try to connect to the IP
