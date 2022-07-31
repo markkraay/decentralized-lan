@@ -1,13 +1,13 @@
 #include "node.hpp"
 
-#include <nlohmann/json.hpp>
+// #include <nlohmann/json.hpp>
 
 #include <fstream>
 #include <set>
 #include <string>
 #include <vector>
 
-using json = nlohmann::json;
+// using json = nlohmann::json;
 
 int main() {
 	Node node = Node();
