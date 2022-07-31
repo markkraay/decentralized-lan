@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 
+#include <vector>
 #include <chrono>
 
 using namespace std::chrono;
@@ -69,9 +70,9 @@ void Node::start() {
 
 	//  Try to connect to other node's on the network
 	int clients = 1; // The current number of clients (one because the server node)
-	std::map<std::string, int> nodes = lan::connect_to_nodes(30);
+	std::vector<int> nodes = lan::connect_to_nodes(30);
 	for (auto node : nodes) {
-		pollfds[clients].fd = node.second;
+		pollfds[clients].fd = node;
 		pollfds[clients].events = POLLIN | POLLPRI;
 		clients++;
 	}
@@ -79,14 +80,19 @@ void Node::start() {
 	char buffer[SOCKET_BUFFER_SIZE]; // For reading messages from the nodes
 	auto next = system_clock::now();
 	while (true) {
-
 		if (system_clock::now() > next) {
 			std::cout << "====================================" << std::endl;
-			std::cout << "Currently connected to " << nodes.size() << " nodes." << std::endl;
-			for (auto pair : nodes) {
-				std::cout << pair.first << std::endl;
+			for (int i = 1; i < MAX_CLIENTS; i++) {
+				if (pollfds[i].fd > 0) {
+					struct sockaddr_in addr;
+					socklen_t len;
+					if (getpeername(pollfds[i].fd, (struct sockaddr *)&addr, &len) == -1) {
+						perror("getpeername: ");
+						exit(EXIT_FAILURE);
+					}
+					std::cout << inet_ntoa(addr.sin_addr) << std::endl;
+				}
 			}
-			std::cout << "====================================" << std::endl;
 			next = system_clock::now() + seconds(30);
 		}
 
@@ -98,7 +104,6 @@ void Node::start() {
 				struct sockaddr_in cliaddr;
 				int addrlen = sizeof(cliaddr);
 				int client_socket = accept(this->node_fd, (struct sockaddr *)&cliaddr, (socklen_t *)&addrlen);
-				nodes.insert(std::make_pair(inet_ntoa(cliaddr.sin_addr), client_socket));
 				/* Adds the new connection into the first available slot in "pollfds"
 				Because the for loop searches for the first slot with a fd == 0, 
 				Whenever a client disconnects, their slot will be filled.

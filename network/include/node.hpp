@@ -5,9 +5,6 @@
 
 #include <sys/poll.h>
 
-#include <map>
-#include <mutex>
-
 /* A Node on the Network.
 Each node on the network uses simple AF_INET + TCP 
 sockets to communicate. All messages sent between nodes
