@@ -84,13 +84,7 @@ void Node::start() {
 			std::cout << "====================================" << std::endl;
 			for (int i = 1; i < MAX_CLIENTS; i++) {
 				if (pollfds[i].fd > 0) {
-					struct sockaddr_in addr;
-					socklen_t len = sizeof(addr);
-					if (getpeername(pollfds[i].fd, (struct sockaddr *)&addr, &len) == -1) {
-						perror("getpeername: ");
-						exit(EXIT_FAILURE);
-					}
-					std::cout << inet_ntoa(addr.sin_addr) << std::endl;
+					std::cout << network_utils::resolve_fd(pollfds[i].fd) << std::endl;
 				}
 			}
 
@@ -114,6 +108,7 @@ void Node::start() {
 				struct sockaddr_in cliaddr;
 				int addrlen = sizeof(cliaddr);
 				int client_socket = accept(this->node_fd, (struct sockaddr *)&cliaddr, (socklen_t *)&addrlen);
+				std::cout << "Accepted connection from: " << network_utils::resolve_fd(client_socket) << std::endl;
 				/* Adds the new connection into the first available slot in "pollfds"
 				Because the for loop searches for the first slot with a fd == 0, 
 				Whenever a client disconnects, their slot will be filled.
@@ -121,7 +116,6 @@ void Node::start() {
 				for (int i = 1; i < MAX_CLIENTS; i++) { 
 					if (pollfds[i].fd == 0) {
 						clients++;
-						printf("Accept succcess: %s. Currently %d nodes in the network.\n", inet_ntoa(cliaddr.sin_addr), clients);
 						pollfds[i].fd = client_socket;
 						pollfds[i].events = POLLIN | POLLPRI;
 						pollfds[i].revents = 0;
@@ -136,13 +130,12 @@ void Node::start() {
 					if (bufSize == -1 || bufSize == 0) { // Reading from the socket failed.
 						pollfds[i].fd = 0;
 						pollfds[i].events = 0;
-						pollfds[i].revents = 0;
 						clients--;
 					} else {
-						pollfds[i].revents = 0; // Zero out the revents so they arn't handled again.
 						buffer[SOCKET_BUFFER_SIZE] = '\0';
-						printf("From client: %s\n", buffer);
+						std::cout << "from " << network_utils::resolve_fd(pollfds[i].fd) << ": " << buffer << std::endl;
 					}
+					pollfds[i].revents = 0; // Zero out the revents so they arn't handled again.
 				}
 			}
 		} 

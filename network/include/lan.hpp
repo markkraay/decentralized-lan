@@ -10,4 +10,5 @@ namespace lan {
 	bool ping_broadcast();
 	int connect_to_node(const std::string& ip);
 	std::vector<int> connect_to_nodes(int timeout_seconds);
+	std::string resolve_fd(int fd);
 };

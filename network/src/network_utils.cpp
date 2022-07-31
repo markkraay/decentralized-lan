@@ -57,3 +57,13 @@ uint16_t network_utils::icmp_checksum(uint16_t *icmph, int len) {
 	
 	return ret; 
 }
+
+std::string network_utils::resolve_fd(int fd) {
+	struct sockaddr_in addr;
+	socklen_t len = sizeof(addr);
+	if (getpeername(fd, (struct sockaddr *)&addr, &len) == -1) {
+		perror("resolve_fd: ");
+		exit(EXIT_FAILURE);
+	}
+	return inet_ntoa(addr.sin_addr);
+}
