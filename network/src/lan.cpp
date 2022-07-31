@@ -18,7 +18,8 @@
 #include <iostream>
 #include <iomanip>
 #include <chrono>
-#include <set>
+#include <map>
+#include <vector>
 
 using namespace std::chrono;
 
@@ -82,7 +83,7 @@ is assumed to be an ICMP response to the ping's request, so we
 decode the ICMP packet to yield the source IP of the packet and 
 attempt a connection on the address.
 */
-std::set<int> lan::connect_to_nodes() {
+std::vector<int> lan::connect_to_nodes() {
 	char error_buffer[PCAP_ERRBUF_SIZE];
 
 	// Get the default ethernet device
@@ -124,71 +125,72 @@ std::set<int> lan::connect_to_nodes() {
 		exit(EXIT_FAILURE);
 	}
 
-  // Read the packets for one minute
 	std::cout << "Attempting to connect to nodes on the LAN" << std::endl;
-	std::set<int> node_fds;
+	std::map<std::string, int> address_fd;
 	auto start = system_clock::now();
 	auto next_broadcast = start;
 	do {
 		time_t now = system_clock::to_time_t(system_clock::now());
 		if (system_clock::now() > next_broadcast) {
-			// Every twenty loops, ping the broadcast address
 			bool ping_success = ping_broadcast();
 			std::cout << std::put_time(std::localtime(&now), "%F %T") << " Pinging Broadcast: " << (ping_success ? "Success" : "Failed") << std::endl;
 			next_broadcast = system_clock::now() + seconds(5);
 		} else {
-			// Otherwise, read packets
 			pcap_pkthdr header;
 			const u_char* packet = pcap_next(pcap_handle, &header);
 			// Get the IP address from the packet
 			if (packet != NULL) {
 				std::string address = network_utils::get_source_address_from_ipv4((struct iphdr *)(packet + sizeof(struct ether_header)));
-				std::cout << "Found address: " << address << ". Attempting to connect... " << std::endl;
-				// Try to connect to the IP
-				int conn_fd = connect_to_node(address, PORT);
-				if (conn_fd == -1) {
-					std::cerr << "\tConnection to " << address << " failed." << std::endl;
+				if (address_fd.find(address) == address_fd.end()) { 
+					std::cout << "Found address: " << address << ". Attempting to connect... " << std::endl;
+					// Try to connect to the IP
+					int conn_fd = connect_to_node(address);
+					if (conn_fd == -1) {
+						std::cerr << "\tConnection to " << address << " failed." << std::endl;
+					}
+					else {
+						std::cout << "\tConnection to " << address << " succeeded. Added to known hosts on network." << std::endl;
+						address_fd.insert(std::make_pair(address, conn_fd));
+					}
 				}
-				else {
-					std::cout << "\tConnection to " << address << " succeeded. Added to known hosts on network." << std::endl;
-				}
-				node_fds.insert(conn_fd);
 			}
 		}
 	} while (system_clock::now() < start + seconds(100));
 
 	std::cout << "Finished" << std::endl;
 
-	return node_fds;
+	std::vector<int> fds;
+	for (auto pair : address_fd) fds.push_back(pair.second);
+	return fds;
 }
 
-int lan::connect_to_node(const std::string& node_ip, int port) {
+int lan::connect_to_node(const std::string& node_ip) {
 	struct sockaddr_in node_addr;
 	int sock;
 
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "socket creation error\n");
+		std::cerr << "socket creation error" << std::endl;
 		return -1;
 	}
 
 	struct timeval timeout;
-	timeout.tv_sec = 20; // Timeout after 7 seconds
+	timeout.tv_sec = 20; // Timeout length in seconds
 	timeout.tv_usec = 0;
 	setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
 	memset(&node_addr, '0', sizeof(node_addr));
 	node_addr.sin_family = AF_INET;
-	node_addr.sin_port = htons(port);
+	node_addr.sin_port = htons(PORT);
 
 	if (inet_pton(AF_INET, node_ip.c_str(), &node_addr.sin_addr) <= 0) {
 		perror("inet_pton: ");
 		return -1;
 	}
 
-	if (connect(sock, (struct sockaddr *)&node_addr, sizeof(node_addr)) == 0) {
+	if (connect(sock, (struct sockaddr *)&node_addr, sizeof(node_addr)) == -1) {
 		perror("connect: ");
 		return -1;
 	}
 
-	return -1;
+	return sock;
 }

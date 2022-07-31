@@ -65,7 +65,7 @@ void Node::start() {
 
 	//  Try to connect to other node's on the network
 	int clients = 1; // The current number of clients (one because the server node)
-	std::set<int> nodes = lan::connect_to_nodes();
+	std::vector<int> nodes = lan::connect_to_nodes();
 	for (int node : nodes) {
 		pollfds[clients].fd = node;
 		pollfds[clients].events = POLLIN | POLLPRI;

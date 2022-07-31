@@ -1,6 +1,5 @@
 #pragma once
 
-#define PORT 3390
 #define SOCKET_BUFFER_SIZE 1024
 #define MAX_CLIENTS 500
 
