@@ -15,6 +15,10 @@
 #include <stdio.h>
 #include <fcntl.h>
 
+#include <chrono>
+
+using namespace std::chrono;
+
 // Upon instantiation of a node, the "serve" function
 // is called in a new thread, so that the node can 
 Node::Node() {}
@@ -65,15 +69,27 @@ void Node::start() {
 
 	//  Try to connect to other node's on the network
 	int clients = 1; // The current number of clients (one because the server node)
-	std::vector<int> nodes = lan::connect_to_nodes(30);
-	for (int node : nodes) {
-		pollfds[clients].fd = node;
+	std::map<std::string, int> nodes = lan::connect_to_nodes(30);
+	for (auto node : nodes) {
+		pollfds[clients].fd = node.second;
 		pollfds[clients].events = POLLIN | POLLPRI;
 		clients++;
 	}
 
 	char buffer[SOCKET_BUFFER_SIZE]; // For reading messages from the nodes
+	auto next = system_clock::now();
 	while (true) {
+
+		if (system_clock::now() > next) {
+			std::cout << "====================================" << std::endl;
+			std::cout << "Currently connected to " << nodes.size() << " nodes." << std::endl;
+			for (auto pair : nodes) {
+				std::cout << pair.first << std::endl;
+			}
+			std::cout << "====================================" << std::endl;
+			next = system_clock::now() + seconds(30);
+		}
+
 		// currentClient + 1 to include the node itself in the size
 		int pollResult = poll(pollfds, clients, 5000); 
 		if (pollResult > 0) { // Some events have been detected
@@ -82,6 +98,7 @@ void Node::start() {
 				struct sockaddr_in cliaddr;
 				int addrlen = sizeof(cliaddr);
 				int client_socket = accept(this->node_fd, (struct sockaddr *)&cliaddr, (socklen_t *)&addrlen);
+				nodes.insert(std::make_pair(inet_ntoa(cliaddr.sin_addr), client_socket));
 				/* Adds the new connection into the first available slot in "pollfds"
 				Because the for loop searches for the first slot with a fd == 0, 
 				Whenever a client disconnects, their slot will be filled.

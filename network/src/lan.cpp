@@ -89,7 +89,7 @@ is assumed to be an ICMP response to the ping's request, so we
 decode the ICMP packet to yield the source IP of the packet and 
 attempt a connection on the address.
 */
-std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
+std::map<std::string, int> lan::connect_to_nodes(int timeout_seconds) {
 	char error_buffer[PCAP_ERRBUF_SIZE];
 
 	// Get the default ethernet device
@@ -163,11 +163,9 @@ std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
 		}
 	} while (system_clock::now() < start + seconds(timeout_seconds));
 
-	std::cout << "Finished" << std::endl;
+	std::cout << "Finished Finding Nodes." << std::endl;
 
-	std::vector<int> fds;
-	for (auto pair : address_fd) fds.push_back(pair.second);
-	return fds;
+	return address_fd;
 }
 
 int lan::connect_to_node(const std::string& node_ip) {
