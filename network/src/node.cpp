@@ -85,7 +85,7 @@ void Node::start() {
 			for (int i = 1; i < MAX_CLIENTS; i++) {
 				if (pollfds[i].fd > 0) {
 					struct sockaddr_in addr;
-					socklen_t len;
+					socklen_t len = sizeof(addr);
 					if (getpeername(pollfds[i].fd, (struct sockaddr *)&addr, &len) == -1) {
 						perror("getpeername: ");
 						exit(EXIT_FAILURE);
@@ -93,6 +93,16 @@ void Node::start() {
 					std::cout << inet_ntoa(addr.sin_addr) << std::endl;
 				}
 			}
+
+			// Send a message to each socket
+			for (int i = 1; i < MAX_CLIENTS; i++) {
+				char *message = "Hello";
+				if (pollfds[i].fd > 0) {
+					if(send(pollfds[i].fd, message, sizeof(message), 0) == -1) {
+						perror("send: ");
+					}
+				}
+		}
 			next = system_clock::now() + seconds(30);
 		}
 
