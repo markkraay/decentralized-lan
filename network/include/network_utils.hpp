@@ -1,5 +1,7 @@
 #pragma once
 
+#include "http/request.hpp"
+
 #include <stdint.h>
 #include <netinet/ip.h>
 
@@ -16,4 +18,5 @@ namespace network_utils {
 	void dump(const unsigned char *data_buffer, const unsigned int length);
 	uint16_t icmp_checksum(uint16_t *icmph, int len);
 	std::string resolve_fd(int fd);
+	http::request parse_http_request(const std::string& http_string);
 };

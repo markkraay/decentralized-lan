@@ -2,39 +2,30 @@ project (Network)
 
 file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
-add_library(${PROJECT_NAME} STATIC ${SRC_FILES})
+add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
 
-find_path(LIBNET_INCLUDE_DIR libnet.h
-	/usr/local/Cellar/libnet/1.2/include
-)
-
-find_path(LIBPCAP_INCLUDE_DIR pcap.h
-	/usr/include
-)
-
-find_library(LIBNET_LIBRARY 
-	NAMES net libnet 
-	PATHS /usr/lib /usr/local/lib
+find_path(PCAP_INCLUDE_DIR pcap.h
+	/usr/include # Linux
+	/usr/local/include # MacOS
 )
 
 find_library(PCAP_LIBRARY
 	NAMES pcap libpcap
-	PATH /usr/lib /usr/local/lib
+	PATH 
+	/usr/lib /usr/local/lib # Linux + MacOS
 )
 
-if (LIBNET_INCLUDE_DIR AND LIBNET_LIBRARY)
-	MESSAGE(STATUS "LIBNET Found!")
-	if (PCAP_LIBRARY AND LIBPCAP_INCLUDE_DIR)
-		MESSAGE(STATUS "LIBPCAP Found!")
-		target_link_libraries(${PROJECT_NAME} 
-			PUBLIC ${LIBNET_LIBRARY} ${PCAP_LIBRARY}
-		)
-	else()
-		MESSAGE(STATUS "LIBPCAP Not Found!")
-	endif()
+if (NOT PCAP_INCLUDE_DIR)
+	message(FATAL_ERROR "Could not find libpcap library")
+elseif (NOT PCAP_LIBRARY) 
+	message(FATAL_ERROR "Could not find libpcap header files")
 else()
-	MESSAGE(STATUS "LIBNET Not Found!")
+	message(STATUS "Found libpcap")
 endif()
+
+target_link_libraries(${PROJECT_NAME} 
+	PUBLIC ${PCAP_LIBRARY} Crypt Blockchain
+)
 
 target_include_directories(${PROJECT_NAME}
 	PUBLIC ${PROJECT_SOURCE_DIR}/include

@@ -1,7 +1,11 @@
 #include "node.hpp"
 
+#include "http/response.hpp"
 #include "lan.hpp"
 #include "network_utils.hpp"
+#include "crypto.hpp"
+
+#include <nlohmann/json.hpp>
 
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -17,16 +21,21 @@
 
 #include <vector>
 #include <chrono>
+#include <regex>
 
 using namespace std::chrono;
+using json = nlohmann::json;
 
-// Upon instantiation of a node, the "serve" function
-// is called in a new thread, so that the node can 
-Node::Node() {}
+/* The node needs a private key to be instantiated
+*/
+Node::Node(const std::string& pkey_location, const std::string& blockchain_location) {
+	this->pkey = crypto::initializeECDSAPrivateKey(pkey_location);
+	this->blockchain = new Blockchain(blockchain_location);
+}
 
 /* When this function is called, the node 
 joins the network, making itself available to other
-nodes so that they to can connect to the node.
+nodes so that they to can connect.
 */
 void Node::start() {
 	// Creating TCP socket for communication with other nodes
@@ -133,13 +142,71 @@ void Node::start() {
 						clients--;
 					} else {
 						buffer[SOCKET_BUFFER_SIZE] = '\0';
-						std::cout << "from " << network_utils::resolve_fd(pollfds[i].fd) << ": " << buffer << std::endl;
+						std::cout << "Received data from " << network_utils::resolve_fd(pollfds[i].fd) << ". Resolving..." << std::endl;
+						this->handle_buffer(pollfds[i].fd, std::string(buffer));
 					}
 					pollfds[i].revents = 0; // Zero out the revents so they arn't handled again.
 				}
 			}
 		} 
 	}
+}
+
+/* Handles HTTP messages and Node messages
+*/
+void Node::handle_buffer(int fd, const std::string& buffer_contents) {
+	std::smatch matches;
+	std::regex_search(buffer_contents, matches, std::regex(R"~(\w+)~"));
+	char result[SOCKET_BUFFER_SIZE];
+	// P2P Node Communication
+	if (matches[0] == "QUERY_LATEST") { 
+
+	} else if (matches[0] == "QUERY_ALL") {
+
+	} else if (matches[0] == "RESPONSE_BLOCKCHAIN") {
+	} else if (matches[0] == "QUERY_TRANSACTION_POOL") {
+
+	} else if (matches[0] == "RESPONSE_TRANSACTION_POOL") {
+	
+	// HTTP Communication
+	} else if (matches[0] == "GET" || matches[0] == "POST") { 
+		std::cout << buffer_contents << std::endl;
+		http::request request = network_utils::parse_http_request(buffer_contents);
+		std::cout << request.to_string() << std::endl;
+
+		http::response response;
+		switch (request.method) {
+			case http::request::GET:
+				if (request.path == "/blocks") {
+				} else if (request.path == "/peers") {
+					// response.body = json::parse(this->getPeers());
+				} else if (request.path == "/unspentTransactionOutputs") {
+				} else if (request.path == "/myUnspentTransactionOutputs") {
+				} else if (request.path == "/balance") {
+				} else if (request.path == "/mineRawBlock") {
+				} else if (request.path == "/mineBlock") {
+				}else if (request.path == "/address") {
+				} else if (request.path == "/mineTransaction") {
+				} else if (request.path == "/sendTransaction") {
+				} else if (request.path == "/stop") {
+				} else {
+					response = http::invalid_path_response;
+				}
+				break;
+			case http::request::POST:
+				if (request.path == "/pay") {
+
+				} else if (request.path == "/balance") { 
+
+				}
+				break;
+		}
+		strcpy(result, response.to_string().c_str());
+	} else { // Unknown
+		strcpy(result, http::invalid_request_response.to_string().c_str());
+	}
+
+	write(fd, result, sizeof result);
 }
 
 /* When this function is called, the node removes itself
@@ -149,4 +216,20 @@ nodes.
 void Node::terminate() {
 	// Close the connections
 
+}
+
+std::vector<std::string> Node::getPeers() {
+	std::vector<std::string> fds;
+	for (int i = 1; i < MAX_CLIENTS; i++) {
+		int fd = this->pollfds[i].fd;
+		if (fd > 0) {
+			fds.push_back(network_utils::resolve_fd(fd));
+		}
+	}
+	return fds;
+}
+
+Node::~Node() {
+	EVP_PKEY_free(this->pkey);
+	delete blockchain;
 }

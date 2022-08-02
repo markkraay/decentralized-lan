@@ -1,6 +1,11 @@
 #include "network_utils.hpp"
 
+#include "nlohmann/json.hpp"
+
 #include <arpa/inet.h>
+
+#include <regex>
+#include <iostream>
 
 std::string network_utils::get_source_address_from_ipv4(ip_header *h) {
 	struct sockaddr_in ip;
@@ -66,4 +71,46 @@ std::string network_utils::resolve_fd(int fd) {
 		exit(EXIT_FAILURE);
 	}
 	return inet_ntoa(addr.sin_addr);
+}
+
+http::request network_utils::parse_http_request(const std::string& http_string) { 
+	// Naively parses a string outlining the information sent in the "request"
+	// field. It is assumed that the request contians the information that 
+	// that would normally be present within a HTTP request. In the event
+	// that this function cannot construct a proper request, a nullptr will be 
+	// returned
+	std::smatch matches;
+	http::request request {
+		http::request::method::GET,
+		"/",
+		""
+	};
+
+	// Checking if it is a "GET", "POST", "PUT", or "DELETE" request
+	std::regex_search(http_string, matches, std::regex(R"~(\w+\ )~"));
+	std::string request_method = matches[0].str();
+
+	if (request_method == "GET ") {
+		std::regex_search(http_string, matches, std::regex(R"~(GET ((\/\w*)+))~"));
+		request.path = matches[1].str();
+	} else if (request_method == "POST ") { 
+		request.method = http::request::method::POST;
+
+		std::regex_search(http_string, matches, std::regex(R"~(POST ((\/\w*)+))~"));
+		request.path = matches[1].str();
+
+		std::regex_search(http_string, matches, std::regex(R"~(\r\n\r\n([\w\ ]*))~"));
+		request.payload = matches[1].str();
+	} else {
+		return {};
+	}
+
+	// If the data is given in json format, try and parse it.
+	std::regex_search(http_string, matches, std::regex(R"~(Content-Type: application\/json)~"));
+	if (matches.size() > 0) { // The match was made
+		std::regex_search(http_string, matches, std::regex(R"~(\r\n\r\n(.*))~"));
+		request.payload = nlohmann::json::parse(std::string(matches[1]));
+	}
+
+	return request;
 }
