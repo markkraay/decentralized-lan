@@ -23,19 +23,19 @@ void network_utils::dump(const unsigned char *data_buffer, const unsigned int le
 	unsigned int i, j;
 	for (i=0; i < length; i++) {
 		byte = data_buffer[i];
-		printf("%02x ", data_buffer[i]); // Display byte in hex
+		printf("%02x ", data_buffer[i]); 
 		if (((i % 16) == 15) || (i == length - 1)) {
 			for (j=0; j < 15 - (i % 16); j++) 
 				printf("  ");
 			printf("| ");
-			for (j=(i-(i % 16)); j <= i; j++) { // Display printable bytes from the line
+			for (j=(i-(i % 16)); j <= i; j++) { 
 				byte = data_buffer[j];
-				if ((byte > 31) && (byte < 127)) // Outside printable character range
+				if ((byte > 31) && (byte < 127)) 
 					printf("%c", byte);
 				else
 					printf(".");
 			}
-			printf("\n"); // End of the dump line (each line is 16 bytes)
+			printf("\n"); 
 		}
 	}
 	return;
@@ -74,11 +74,6 @@ std::string network_utils::resolve_fd(int fd) {
 }
 
 http::request network_utils::parse_http_request(const std::string& http_string) { 
-	// Naively parses a string outlining the information sent in the "request"
-	// field. It is assumed that the request contians the information that 
-	// that would normally be present within a HTTP request. In the event
-	// that this function cannot construct a proper request, a nullptr will be 
-	// returned
 	std::smatch matches;
 	http::request request {
 		http::request::method::GET,

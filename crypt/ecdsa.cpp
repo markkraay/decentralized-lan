@@ -18,7 +18,7 @@
 // can be found.
 EVP_PKEY* crypto::initializeECDSAPrivateKey(const std::string& location) {
 	FILE* pkey_file = fopen(location.c_str(), "r");
-	if (pkey_file == NULL) { // The file need is not present, so we need to create it
+	if (pkey_file == NULL) { 
 		return crypto::createECDSAPrivateKey(location);
 	} else {
 		fclose(pkey_file);
@@ -45,7 +45,7 @@ EVP_PKEY* crypto::createECDSAPrivateKey(const std::string& location) {
 	EVP_PKEY* pkey = NULL;
 	FILE* pkey_file = fopen(location.c_str(), "w");
 	if (pkey_file != NULL) {
-		EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_ED25519, NULL); // Try EVP_PKEY_ED25519 || EVP_PKEY_EC
+		EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_ED25519, NULL); 
 		if (!ctx) {
 			perror("EVP_PKEY_CTX_new_id: ");
 			exit(EXIT_FAILURE);
@@ -135,9 +135,9 @@ bool crypto::verifyWithECDSA(const std::string& digest, const std::string& signa
 	}
 
 	if (EVP_PKEY_verify(ctx, sig, siglen, md, mdlen) <= 0) {
-		return false; // Failed to verify
+		return false; 
 	}
-	return true; // Successfully verified
+	return true; 
 }
 
 std::string crypto::getPublicKey(EVP_PKEY *pkey) {

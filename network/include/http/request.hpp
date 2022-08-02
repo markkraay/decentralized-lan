@@ -7,6 +7,7 @@
 namespace http {
 	// Outlines the anatomy of an HTTP request
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Messages
+
 	typedef struct {
 		enum method {
 			GET, 

@@ -179,7 +179,6 @@ void Node::handle_buffer(int fd, const std::string& buffer_contents) {
 			case http::request::GET:
 				if (request.path == "/blocks") {
 				} else if (request.path == "/peers") {
-					// response.body = json::parse(this->getPeers());
 				} else if (request.path == "/unspentTransactionOutputs") {
 				} else if (request.path == "/myUnspentTransactionOutputs") {
 				} else if (request.path == "/balance") {
@@ -214,7 +213,6 @@ from the network, closing socket connections with the other
 nodes.
 */
 void Node::terminate() {
-	// Close the connections
 
 }
 

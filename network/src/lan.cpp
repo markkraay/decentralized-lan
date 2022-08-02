@@ -104,8 +104,6 @@ std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
 	pcap_lookupnet(device, &netp, &maskp, error_buffer); // Getting the IP address and subnet mask
 
 	std::cout << "Sniffing on device " << device << std::endl;
-	// Device, snaplen, promisc, timeout
-	// pcap_t *pcap_handle = pcap_open_live(device, 4096, 1, 100, error_buffer);
 	pcap_t *pcap_handle = pcap_create(device, error_buffer);
 	if (pcap_handle == NULL) {
 		std::cerr << "pcap creation failed: " << error_buffer << std::endl;
@@ -140,7 +138,7 @@ std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
 		if (system_clock::now() > next_broadcast) {
 			bool ping_success = ping_broadcast();
 			std::cout << std::put_time(std::localtime(&now), "%F %T") << " Pinging Broadcast: " << (ping_success ? "Success" : "Failed") << std::endl;
-			next_broadcast = system_clock::now() + seconds(timeout_seconds / 3); // Will perform three broadcasts
+			next_broadcast = system_clock::now() + seconds(timeout_seconds / 3); 
 		} else {
 			pcap_pkthdr header;
 			const u_char* packet = pcap_next(pcap_handle, &header);
@@ -180,7 +178,7 @@ int lan::connect_to_node(const std::string& node_ip) {
 	}
 
 	struct timeval timeout;
-	timeout.tv_sec = 10; // Timeout length in seconds
+	timeout.tv_sec = 10; /
 	timeout.tv_usec = 0;
 	setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 

@@ -15,24 +15,20 @@ private:
 	std::vector<Block> blocks;
 	std::vector<UnspentTxOut> unspent_tx_outs;
 
-/* These should be accessible to other instances of the blockchain, but
-inaccessible everywhere else.
-*/
 protected: 
 
-	bool isValidChain(); // Determines if a blockchain is valid
-	void replaceChain(const Blockchain* blockchain); // Compares two chains and replaces the current one's data if the other chain is superior
+	bool isValidChain(); 
+	void replaceChain(const Blockchain* blockchain); 
 	int getDifficulty();
 	int getAdjustedDifficulty();
 	int size();
 	int getAccumulatedDifficulty();
 	Block getLatestBlock();
 
-// These are the functions that are accessible to the node.
 public:
 	Blockchain();
-	Blockchain(const Block& genesis_block); // A genesis block
-	Blockchain(const json& j); // JSON file on the disk
+	Blockchain(const Block& genesis_block); 
+	Blockchain(const json& j); 
 
 	std::vector<Block> getBlockchain() const;
 	std::vector<UnspentTxOut> getUnspentTxOuts() const;
