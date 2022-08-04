@@ -3,6 +3,10 @@
 #include "nlohmann/json.hpp"
 
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <netdb.h>
 
 #include <regex>
 #include <iostream>
@@ -74,6 +78,8 @@ std::string network_utils::resolve_fd(int fd) {
 }
 
 http::request network_utils::parse_http_request(const std::string& http_string) { 
+	std::cout << http_string << std::endl;
+
 	std::smatch matches;
 	http::request request {
 		http::request::method::GET,
@@ -108,4 +114,31 @@ http::request network_utils::parse_http_request(const std::string& http_string) 
 	}
 
 	return request;
+}
+
+std::string network_utils::get_ipv4_lan_address(const std::string& device) {
+	struct ifaddrs *ifaddr, *ifa;
+  int family, s;
+  char host[NI_MAXHOST];
+
+  if (getifaddrs(&ifaddr) == -1)
+  {
+      perror("getifaddrs");
+      exit(EXIT_FAILURE);
+  }
+
+  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+  {
+    if (ifa->ifa_addr == NULL)
+      continue;
+
+		if (ifa->ifa_addr->sa_family == AF_INET) {
+    	s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+    	if (s == 0 && strcmp(ifa->ifa_name, device.c_str()) == 0) {
+				return std::string(host);
+			}
+		}
+  }
+
+	return "";
 }

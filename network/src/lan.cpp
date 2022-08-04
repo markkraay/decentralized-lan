@@ -89,7 +89,7 @@ is assumed to be an ICMP response to the ping's request, so we
 decode the ICMP packet to yield the source IP of the packet and 
 attempt a connection on the address.
 */
-std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
+std::pair<std::string, std::vector<int>> lan::connect_to_nodes(int timeout_seconds) {
 	char error_buffer[PCAP_ERRBUF_SIZE];
 
 	// Get the default ethernet device
@@ -99,7 +99,7 @@ std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
 		exit(EXIT_FAILURE);
 	}
 
-  bpf_u_int32 maskp; // Subnet mask
+  bpf_u_int32 maskp; // Mask
   bpf_u_int32 netp; // IP     
 	pcap_lookupnet(device, &netp, &maskp, error_buffer); // Getting the IP address and subnet mask
 
@@ -165,7 +165,7 @@ std::vector<int> lan::connect_to_nodes(int timeout_seconds) {
 
 	std::vector<int> fds;
 	for (auto pair : address_fd) fds.push_back(pair.second);
-	return fds;
+	return std::make_pair(std::string(device), fds);
 }
 
 int lan::connect_to_node(const std::string& node_ip) {
@@ -178,7 +178,7 @@ int lan::connect_to_node(const std::string& node_ip) {
 	}
 
 	struct timeval timeout;
-	timeout.tv_sec = 10; /
+	timeout.tv_sec = 10; 
 	timeout.tv_usec = 0;
 	setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 

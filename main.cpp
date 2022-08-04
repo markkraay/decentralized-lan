@@ -8,6 +8,8 @@
 using json = nlohmann::json;
 
 int main() {
+	Node node("private_key.pem", "blockchain.json");
+	node.start();
 
 	return 0;
 }

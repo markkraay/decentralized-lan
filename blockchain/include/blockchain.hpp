@@ -27,6 +27,7 @@ protected:
 
 public:
 	Blockchain();
+	Blockchain(std::vector<Block> blocks, std::vector<UnspentTxOut> tx_outs);
 	Blockchain(const Block& genesis_block); 
 	Blockchain(const json& j); 
 

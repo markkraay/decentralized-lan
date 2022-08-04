@@ -3,21 +3,29 @@
 #include "crypto.hpp"
 
 #include <iostream>
-#include <fstream>
 
+// ======================================================
+// Constructors
+// ======================================================
 Blockchain::Blockchain() {}
+
+Blockchain::Blockchain(std::vector<Block> blocks, std::vector<UnspentTxOut> tx_outs) { 
+	this->blocks = blocks;  
+	this->unspent_tx_outs = tx_outs;
+}
 
 Blockchain::Blockchain(const Block& genesis_block) {
 	this->blocks.push_back(genesis_block);
 }
 
 Blockchain::Blockchain(const json& j) {
-	this->blocks = std::vector<Block>{};
-	// this->blocks = j.at("blocks").get<std::vector<Block>>();
+	this->blocks = j.at("blocks").get<std::vector<Block>>();
 	this->unspent_tx_outs = j.at("unspent_tx_outs").get<std::vector<UnspentTxOut>>();
 }
 
-// Public Getters 
+// ======================================================
+// Public Getters
+// ======================================================
 std::vector<Block> Blockchain::getBlockchain() const { return this->blocks; }
 
 std::vector<UnspentTxOut> Blockchain::getUnspentTxOuts() const { return  this->unspent_tx_outs; }
@@ -39,9 +47,11 @@ json Blockchain::to_json() const {
 	return j;
 }
 
-
+// ======================================================
 // Protected Getters
+// ======================================================
 Block Blockchain::getLatestBlock() { return this->blocks.back(); }
+
 int Blockchain::size() { return this->blocks.size(); }
 
 /* Returns the difficulty of the blockchain. The difficulty is defined as the number
@@ -75,6 +85,17 @@ int Blockchain::getAdjustedDifficulty() {
 	}
 	return base;
 }
+
+// ======================================================
+// Validation Functions
+// ======================================================
+
+
+// ======================================================
+// Editing Functions
+// ======================================================
+
+
 
 // void Blockchain::generateNextBlock()
 

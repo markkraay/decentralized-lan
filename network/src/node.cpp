@@ -14,11 +14,14 @@
 #include <sys/socket.h>
 #include <iostream>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
 
+#include <algorithm>
+#include <fstream>
 #include <vector>
 #include <chrono>
 #include <regex>
@@ -26,11 +29,56 @@
 using namespace std::chrono;
 using json = nlohmann::json;
 
-/* The node needs a private key to be instantiated
-*/
+/* The node needs a private key and an initial copy of the blockchain to be instantiated
+The node first checks if there is a file on disc that contains a copy of the last scene blockchain. 
+If such file exists, the node reads it contents and initializes its copy of the blockchain accordingly.
+Otherwise, the node creates its own copy of the blockchain and writes it to disc.
+*/ 
 Node::Node(const std::string& pkey_location, const std::string& blockchain_location) {
 	this->pkey = crypto::initializeECDSAPrivateKey(pkey_location);
-	this->blockchain = new Blockchain(blockchain_location);
+	this->blockchain_location = blockchain_location;
+	std::fstream file(blockchain_location, std::fstream::in);
+
+	if (file.is_open()) {
+		try {
+			std::cout << "Successfully obtained last seen copy of blockchain from " << blockchain_location << std::endl;
+			this->blockchain = new Blockchain(json::parse(file));
+			return;
+		} catch (json::parse_error& error) {
+			std::cerr << "Could not parse the blockchain at " << blockchain_location << ". Creating a new copy using the following genesis block: ";
+		}
+	} else {
+		std::cout << "Could not find a copy of the blockchain on disk... Creating a new one using the following genesis block: ";
+	}
+	std::cout << GENESIS_BLOCK.to_json() << std::endl;
+	this->blockchain = new Blockchain(GENESIS_BLOCK);
+	file.close();
+	this->updateChain();
+}
+
+std::string Node::getIPv4Address() {
+  char hostbuffer[256];
+ 
+  if (gethostname(hostbuffer, sizeof(hostbuffer)) == -1) {
+		perror("gethostname: ");
+		exit(EXIT_FAILURE);
+	}
+ 
+  // To retrieve host information
+  struct hostent *host_entry = gethostbyname(hostbuffer);
+ 
+  // To convert an Internet network
+  // address into ASCII string
+  char *address = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
+	return std::string(address);
+}
+
+/* Writes the current blockchain's data to the file pointed to by 'blockchain_download'
+*/
+void Node::updateChain() {
+	std::fstream file(this->blockchain_location, std::fstream::out);
+	file << this->blockchain->to_json();
+	file.close();
 }
 
 /* When this function is called, the node 
@@ -79,12 +127,14 @@ void Node::start() {
 
 	//  Try to connect to other node's on the network
 	int clients = 1; // The current number of clients (one because the server node)
-	std::vector<int> nodes = lan::connect_to_nodes(30);
-	for (auto node : nodes) {
-		pollfds[clients].fd = node;
-		pollfds[clients].events = POLLIN | POLLPRI;
-		clients++;
-	}
+	// std::pair<std::string, std::vector<int>> result = lan::connect_to_nodes(30);
+	// this->sniffing_device = result.first;
+	// auto nodes = result.second;
+	// for (auto node : nodes) {
+	// 	pollfds[clients].fd = node;
+	// 	pollfds[clients].events = POLLIN | POLLPRI;
+	// 	clients++;
+	// }
 
 	char buffer[SOCKET_BUFFER_SIZE]; // For reading messages from the nodes
 	auto next = system_clock::now();
@@ -141,9 +191,9 @@ void Node::start() {
 						pollfds[i].events = 0;
 						clients--;
 					} else {
-						buffer[SOCKET_BUFFER_SIZE] = '\0';
+						buffer[bufSize] = '\0';
 						std::cout << "Received data from " << network_utils::resolve_fd(pollfds[i].fd) << ". Resolving..." << std::endl;
-						this->handle_buffer(pollfds[i].fd, std::string(buffer));
+						this->handleBuffer(pollfds[i].fd, std::string(buffer));
 					}
 					pollfds[i].revents = 0; // Zero out the revents so they arn't handled again.
 				}
@@ -154,42 +204,45 @@ void Node::start() {
 
 /* Handles HTTP messages and Node messages
 */
-void Node::handle_buffer(int fd, const std::string& buffer_contents) {
+void Node::handleBuffer(int fd, const std::string& buffer_contents) {
 	std::smatch matches;
 	std::regex_search(buffer_contents, matches, std::regex(R"~(\w+)~"));
-	char result[SOCKET_BUFFER_SIZE];
 	// P2P Node Communication
 	if (matches[0] == "QUERY_LATEST") { 
 
 	} else if (matches[0] == "QUERY_ALL") {
 
 	} else if (matches[0] == "RESPONSE_BLOCKCHAIN") {
+
 	} else if (matches[0] == "QUERY_TRANSACTION_POOL") {
 
 	} else if (matches[0] == "RESPONSE_TRANSACTION_POOL") {
 	
 	// HTTP Communication
 	} else if (matches[0] == "GET" || matches[0] == "POST") { 
-		std::cout << buffer_contents << std::endl;
 		http::request request = network_utils::parse_http_request(buffer_contents);
 		std::cout << request.to_string() << std::endl;
 
-		http::response response;
 		switch (request.method) {
 			case http::request::GET:
 				if (request.path == "/blocks") {
+					this->handleGetBlocks(fd);
 				} else if (request.path == "/peers") {
+					this->handleGetPeers(fd);
 				} else if (request.path == "/unspentTransactionOutputs") {
-				} else if (request.path == "/myUnspentTransactionOutputs") {
+					this->handleGetUnspentTransactionOutputs(fd, request.payload);
 				} else if (request.path == "/balance") {
+					this->handleGetBalance(fd, request.payload);
 				} else if (request.path == "/mineRawBlock") {
 				} else if (request.path == "/mineBlock") {
-				}else if (request.path == "/address") {
+				} else if (request.path == "/address") {
+					this->handleGetAddress(fd);
 				} else if (request.path == "/mineTransaction") {
 				} else if (request.path == "/sendTransaction") {
 				} else if (request.path == "/stop") {
+					this->terminate();
 				} else {
-					response = http::invalid_path_response;
+					this->handleUnknownRequest(fd);
 				}
 				break;
 			case http::request::POST:
@@ -200,12 +253,8 @@ void Node::handle_buffer(int fd, const std::string& buffer_contents) {
 				}
 				break;
 		}
-		strcpy(result, response.to_string().c_str());
 	} else { // Unknown
-		strcpy(result, http::invalid_request_response.to_string().c_str());
 	}
-
-	write(fd, result, sizeof result);
 }
 
 /* When this function is called, the node removes itself
@@ -216,18 +265,144 @@ void Node::terminate() {
 
 }
 
-std::vector<std::string> Node::getPeers() {
-	std::vector<std::string> fds;
-	for (int i = 1; i < MAX_CLIENTS; i++) {
-		int fd = this->pollfds[i].fd;
-		if (fd > 0) {
-			fds.push_back(network_utils::resolve_fd(fd));
-		}
-	}
-	return fds;
-}
-
 Node::~Node() {
 	EVP_PKEY_free(this->pkey);
-	delete blockchain;
+}
+
+// ======================================================
+// P2P Communication Handles
+// ======================================================
+// void Node::handleQueryLatest() {
+
+// }
+
+// void Node::handleQueryAll() {
+
+// }
+
+// void Node::handleResponseBlockchain() {
+
+// }
+
+// void Node::handleQueryTransactionPool() {
+
+// }
+
+// void Node::handleResponseTransactionPool() {
+
+// }
+
+// ======================================================
+// HTTP Communication Handles
+// ======================================================
+void Node::handleGetBlocks(int fd) {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+
+	auto blocks = this->blockchain->getBlockchain();
+	std::vector<Block> last_5(blocks.end() - std::min(5, (int)blocks.size()), blocks.end());
+	Blockchain new_chain(last_5, this->blockchain->getUnspentTxOuts());
+	std::string body = new_chain.to_json().dump();
+
+	auto result = http::ok_response(body).to_string();
+	strcpy(message_buffer, result.c_str());
+	write(fd, message_buffer, result.size());
+}
+
+void Node::handleGetPeers(int fd) {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+
+	std::vector<std::string> ips;
+	for (int i = 1; i < MAX_CLIENTS; i++) {
+		int fd = pollfds[i].fd;
+		if (fd > 0) {
+			ips.push_back(network_utils::resolve_fd(fd));
+		}
+	}
+	json j;
+	j["ips"] = ips;
+	std::string body = j.dump();
+
+	auto result = http::ok_response(body).to_string();
+	strcpy(message_buffer, result.c_str());
+	write(fd, message_buffer, result.size());
+}
+
+void Node::handleGetUnspentTransactionOutputs(int fd, const json& j) {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+
+	try {
+		auto address = j.at("address").get<std::string>(); 
+		auto u = this->blockchain->getUnspentTxOuts();
+		if (address != "") {
+			u.erase(std::remove_if(u.begin(), u.end(), [&](const UnspentTxOut& tx) {
+  	      return tx.address != address;
+  	  }), u.end());
+		}
+		std::string body = json(u).dump();
+
+		auto result = http::ok_response(body).to_string();
+		strcpy(message_buffer, result.c_str());
+		write(fd, message_buffer, result.size());
+	} catch (json::parse_error& error) {
+		this->handleUnknownRequest(fd);
+	}
+}
+
+void Node::handleGetBalance(int fd, const json& j) {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+
+	try { 
+		auto address = j.at("address").get<std::string>();
+
+		int total = 0;
+		for (auto u_tx_out : this->blockchain->getUnspentTxOuts()) {
+			if (u_tx_out.address == address) {
+				total += u_tx_out.amount;
+			}
+		}
+
+		json j;
+		j["balance"] = total;
+		std::string body = j.dump();
+	
+		auto result = http::ok_response(body).to_string();
+		strcpy(message_buffer, result.c_str());
+		write(fd, message_buffer, result.size());
+	} catch(json::parse_error& error) {
+		this->handleUnknownRequest(fd);
+	}
+}
+
+void Node::handleGetAddress(int fd) {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+
+	/* For the public key to be returned, the user must cURL the endpoint of the node
+	that is currently running on their own machine. For example, if a node is being hosted
+	on 192.168.1.211, the user must curl this address from the same machine to get their public key.
+	*/
+	auto requesting_address = network_utils::resolve_fd(fd);
+	auto host_address = network_utils::get_ipv4_lan_address(this->sniffing_device);
+	if (requesting_address == host_address) {
+		auto result = http::ok_response(crypto::getPublicKey(this->pkey)).to_string();
+		strcpy(message_buffer, result.c_str());
+		write(fd, message_buffer, result.size());
+	} else {
+		this->handleUnauthorizedRequest(fd);
+	}
+}
+
+void Node::handleUnknownRequest(int fd) {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+
+	auto result = http::invalid_path_response.to_string();
+	strcpy(message_buffer, result.c_str());
+	write(fd, message_buffer, result.size());
+}
+
+void Node::handleUnauthorizedRequest(int fd) {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+
+	auto result = http::unauthorized_request_response.to_string();
+	strcpy(message_buffer, result.c_str());
+	write(fd, message_buffer, result.size());
 }

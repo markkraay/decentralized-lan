@@ -1,5 +1,8 @@
 #include "transaction.hpp"
 
+// ======================================================
+// Constructors
+// ======================================================
 Transaction::Transaction() {}
 
 Transaction::Transaction(std::string id, std::vector<TxIn> tx_ins, std::vector<TxOut> tx_outs) {
@@ -14,6 +17,9 @@ Transaction::Transaction(const json& j) : Transaction(
 	j.at("tx_outs").get<std::vector<TxOut>>()
 ) {}
 
+// ======================================================
+// Getters
+// ======================================================
 json Transaction::to_json() const {
 	json j;
 	j["id"] = this->id;

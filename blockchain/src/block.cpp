@@ -1,5 +1,8 @@
 #include "block.hpp"
 
+// ======================================================
+// Constructors
+// ======================================================
 Block::Block() {}
 
 Block::Block(int index, std::string hash, std::string previous_hash, int timestamp, std::vector<Transaction> data, int difficulty, int nonce) {
@@ -22,7 +25,9 @@ Block::Block(const json& j) : Block(
 	j.at("nonce").get<int>()
 ) {}
 
+// ======================================================
 // Getters
+// ======================================================
 int Block::getIndex() const { return this->index; }
 std::string Block::getHash() const { return this->hash; }
 std::string Block::getPreviousHash() const { return this->previous_hash; }

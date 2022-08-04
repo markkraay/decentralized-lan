@@ -19,4 +19,5 @@ namespace network_utils {
 	uint16_t icmp_checksum(uint16_t *icmph, int len);
 	std::string resolve_fd(int fd);
 	http::request parse_http_request(const std::string& http_string);
+	std::string get_ipv4_lan_address(const std::string& device);
 };
