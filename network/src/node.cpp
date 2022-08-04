@@ -266,7 +266,7 @@ void Node::terminate() {
 }
 
 Node::~Node() {
-	EVP_PKEY_free(this->pkey);
+	crypto::freeECDSAPrivateKey(this->pkey);
 }
 
 // ======================================================

@@ -14,6 +14,14 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	set(WINDOWS TRUE)
 endif()
 
+if(MACOS) 
+	set(OPENSSL_ROOT_DIR "/usr/local/Cellar/openssl@3/3.0.5")
+	include_directories(${PROJECT_NAME} PUBLIC 
+		"/usr/local/include"
+		"/usr/local/Cellar/openssl@3/3.0.5/include"
+	)
+endif()
+
 add_subdirectory(crypt)
 add_subdirectory(blockchain)
 add_subdirectory(network)
