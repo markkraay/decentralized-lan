@@ -27,7 +27,7 @@ struct TxOut {
 };
 
 struct UnspentTxOut {
-	std::string tx_out;  //
+	std::string tx_out_id;  //
 	int tx_out_index;	   // 
 	std::string address; // The public key of the owner 
 	int amount;
@@ -40,10 +40,12 @@ class Transaction {
 
 public:
 	Transaction();
-	Transaction(std::string id, std::vector<TxIn> tx_ins, std::vector<TxOut> tx_outs);
+	Transaction(std::vector<TxIn> tx_ins, std::vector<TxOut> tx_outs);
 	Transaction(const json& j);
 
 	json to_json() const;
+
+	bool validateTxIn(TxIn tx_in, const std::vector<UnspentTxOut>& u_tx_outs);
 };
 
 // ======================================================
@@ -75,14 +77,14 @@ inline void from_json(const json& j, TxOut& t) {
 inline void to_json(json& j, const UnspentTxOut& t) {
 	j["address"] = t.address;
 	j["amount"] = t.amount;
-	j["tx_out"] = t.tx_out;
+	j["tx_out_id"] = t.tx_out_id;
 	j["tx_out_index"] = t.tx_out_index;
 }
 
 inline void from_json(const json& j, UnspentTxOut& t) {
 	t.address = j.at("address").get<std::string>();
 	t.amount = j.at("amount").get<int>();
-	t.tx_out = j.at("tx_out").get<std::string>();
+	t.tx_out_id = j.at("tx_out_id").get<std::string>();
 	t.tx_out_index = j.at("tx_out_index").get<int>();
 }
 

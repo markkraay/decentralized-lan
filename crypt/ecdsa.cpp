@@ -137,6 +137,7 @@ bool crypto::verifyWithECDSA(const std::string& digest, const std::string& signa
 	if (EVP_PKEY_verify(ctx, sig, siglen, md, mdlen) <= 0) {
 		return false; 
 	}
+	
 	return true; 
 }
 

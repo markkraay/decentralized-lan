@@ -35,29 +35,39 @@ namespace http {
 		}
 	} response;
 
-	http::response invalid_path_response {
-		{404, "Page Not Found"},
-		{"html/text", 15},
-		"Invalid Path\r\n"
-	};
-
-	http::response invalid_request_response {
-		{404, "Page Not Found"},
-		{"html/text", 18},
-		"Invalid Request\r\n"
-	};
-
-	http::response unauthorized_request_response {
-		{401, "Unauthorized Request"},
-		{"html/text", 52},
-		"You do not have permission to access this endpoint\r\n"
-	};
-
-	http::response ok_response(std::string body) {
+	http::response response_200(std::string body) {
 		return http::response {
 			{200, "OK"},
 			{"application/json", (int)body.size() + 2},
 			body + "\r\n"
 		};
 	}
+
+	http::response response_401(std::string body) {
+		return http::response {
+			{401, "Unauthorized Request"},
+			{"html/text", (int)body.size() + 2},
+			body + "\r\n"
+		};
+	}
+
+	http::response response_404(std::string body) {
+		return http::response {
+			{404, "Page Not Found"},
+			{"html/text", (int)body.size() + 2},
+			body + "\r\n"
+		};
+	}
+
+	http::response response_500(std::string body) {
+		return http::response {
+			{500, "Internal Server Error"},
+			{"html/text", (int)body.size() + 2},
+			body + "\r\n"
+		};
+	}
+
+	http::response invalid_request_response = response_404("Invalid Request");
+	http::response invalid_path_response = response_404("Invalid Path");
+	http::response unauthorized_request_response = response_401("You do not have permission to access this endpoint");
 };

@@ -32,15 +32,23 @@ private:
 
 	void handleBuffer(int fd, const std::string& buffer_contents);
 	void updateChain();
+	bool confirmSender(int fd);
 
+	// GET
 	void handleGetBlocks(int fd);
 	void handleGetPeers(int fd);
 	void handleGetUnspentTransactionOutputs(int fd, const json& j);
 	void handleGetBalance(int fd, const json& j);
+	void handleGetTransactionPool(int fd);
+	void handleGetAddress(int fd);
 
+	// POST
+	void handleMineBlock(int fd);
+	void handlePay(int fd, const json& j);
+
+	// MISC
 	void handleUnknownRequest(int fd);
 	void handleUnauthorizedRequest(int fd);
-	void handleGetAddress(int fd);
 
 public: 
 	Node(const std::string& pkey_location, const std::string& blockchain_location);
@@ -48,6 +56,4 @@ public:
 
 	void terminate();
 	~Node();
-
-	std::string getIPv4Address();
 };

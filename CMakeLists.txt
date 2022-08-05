@@ -25,9 +25,10 @@ endif()
 add_subdirectory(crypt)
 add_subdirectory(blockchain)
 add_subdirectory(network)
+add_subdirectory(node)
 
 add_executable(${PROJECT_NAME} main.cpp)
 
 target_link_libraries(LANCoin 
-	PUBLIC Crypt Blockchain Network
+	PUBLIC Crypt Blockchain Network Node
 )
