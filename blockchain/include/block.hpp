@@ -27,6 +27,7 @@ public:
 	);
 	Block(const json& j);
 
+	// Getters
 	int getIndex() const;
 	std::string getHash() const;
 	std::string getPreviousHash() const;
@@ -34,6 +35,17 @@ public:
 	std::vector<Transaction> getData() const;
 	int getNonce() const;
 	int getDifficulty() const;
+	static int getCurrentTimestamp();
+
+	// Validators
+	bool hasValidTimestamp(const Block& previous);
+	bool hasValidHash();
+	bool isValidNewBlock(const Block& previous);
+	bool hashMatchesDifficulty();
+
+	// Hashers
+	std::string calculateHash();
+	static std::string Block::calculateHash(int index, const std::string& hash, int timestamp, const std::vector<Transaction>& transactions, int difficulty, int nonce) {
 
 	json to_json() const;
 };

@@ -46,6 +46,8 @@ public:
 	json to_json() const;
 
 	bool validateTxIn(TxIn tx_in, const std::vector<UnspentTxOut>& u_tx_outs);
+	std::vector<TxIn> getTxIns() const;
+	std::vector<TxOut> getTxOuts() const;
 };
 
 // ======================================================

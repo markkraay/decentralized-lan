@@ -3,6 +3,7 @@
 #include "block.hpp"
 #include "transaction.hpp"
 
+#include <openssl/evp.h>
 #include <nlohmann/json.hpp>
 
 #include <functional>
@@ -28,11 +29,12 @@ protected:
 
 	// Validators
 	bool isValidChain(); 
-	bool validateTransaction(const Transaction& tx);
+	bool isValidTransaction(const Transaction& tx);
+	bool validateTxIn(const TxIn& tx_in)
 	bool isValidTxForPool(const Transaction& tx);
 
 	// Blockchain editors
-	bool addToTransactionPool(Transaction tx);
+	bool addTransactionToPool(const Transaction& tx);
 
 public:
 	Blockchain();
@@ -47,7 +49,7 @@ public:
 	int getBalance(const std::string& address) const;
 
 	void mineNextBlock();
-	bool sendTransaction(const std::string& receiver, const std::string& sender, int amount, std::function<TxIn(TxIn)> signer);
+	bool sendTransaction(EVP_PKEY* pkey, const std::string& receiver, int amount);
 
 	json to_json() const;
 };

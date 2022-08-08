@@ -1,5 +1,7 @@
 #include "block.hpp"
 
+#include "crypto.hpp"
+
 // ======================================================
 // Constructors
 // ======================================================
@@ -36,6 +38,12 @@ std::vector<Transaction> Block::getData() const { return this->data; }
 int Block::getNonce() const { return this->nonce; }
 int Block::getDifficulty() const { return this->difficulty; }
 
+int Block::getCurrentTimestamp() { 
+	auto now = std::chrono::system_clock::now();
+	return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+}
+
+
 json Block::to_json() const {
 	json j;
 	j["index"] = this->index;
@@ -47,3 +55,71 @@ json Block::to_json() const {
 	j["nonce"] = this->nonce;
 	return j;
 }
+
+// ======================================================
+// Validators
+// ======================================================
+bool Block::hasValidTimestamp(const Block& previous) {
+	return previous.getTimestamp() - 60 < this->timestamp && this->timestamp - 60 < Blockchain::getCurrentTimestamp;
+}
+
+bool Block::hasValidHash() {
+	if (this->hash != this->calculateHash()) {
+		std::cerr << "hasValidHash: hash" << std::endl;
+		return false;
+	} else if (!this->hashMatchesDifficulty()) {
+		std::cerr << "hasValidHash: difficulty" << std::endl;
+		return false;
+	}
+	return true;
+}
+
+bool Block::isValidNewBlock(const Block& previous) {
+	if (previous.getIndex() + 1 != this->index) {
+		std::cerr << "isValidNewBlock: index" << std::endl;
+		return false;
+	} else if (previous.getHash() != this->hash) {
+		std::cerr << "isValidNewBlock: hash" << std::endl;
+		return false;
+	} else if (!this->hasValidTimestamp(previous)) {
+		std::cerr << "isValidNewBlock: timestamp" << std::endl;
+		return false;
+	} else if (!this->hashValidHash()) {
+		std::cerr << "isValidNewBlock: timestamp" << std::endl;
+		return false;
+	}
+	return true;
+}
+
+bool Block::hashMatchesDifficulty() {
+	// Convert the hash to binary
+	std::string out = "";
+	for (char i : this->hash) {
+		uint8_t n;
+    if(i <= '9' and i >= '0')
+      n = i - '0';
+    else
+      n = 10 + i - 'A';
+    for (int8_t j = 3; j >= 0; --j)
+      out.push_back((n & (1<<j))? '1':'0');
+	}
+	// Check if the first 'difficult' characters are equalt to '0'
+	return (out.substr(0, this->difficulty)) == std::string('0', this->difficulty);
+}
+
+// ======================================================
+// Hashers
+// ======================================================
+std::string Block::calculateHash() {
+	return Block::calculateHash(this->index, this->hash, this->timestamp, this->data, this->difficulty, this->nonce);
+}
+
+std::string Block::calculateHash(int index, const std::string& hash, int timestamp, const std::vector<Transaction>& transactions, int difficulty, int nonce) {
+	std::string content = std::to_string(index) + hash + std::to_string(timestamp);
+	for (auto t : transactions) {
+		content += t.to_json().dump();
+	}
+	content += std::to_string(difficulty) + std::to_string(nonce);
+	return crypto::SHA256(content);
+}
+

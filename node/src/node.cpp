@@ -325,12 +325,12 @@ void Node::handleGetUnspentTransactionOutputs(int fd, const json& j) {
 
 	try {
 		auto address = j.at("address").get<std::string>(); 
+		std::vector<UnspentTxOut> u;
 
-		auto u = this->blockchain->getUnspentTxOuts();
 		if (address != "") {
-			u.erase(std::remove_if(u.begin(), u.end(), [&](const UnspentTxOut& tx) {
-  	      return tx.address != address;
-  	  }), u.end());
+			u = this->blockchain->getUnspentTxOutsGivenAddress(address);
+		} else {
+			u = this->blockchain->getUnspentTxOuts();
 		}
 		std::string body = json(u).dump();
 
