@@ -35,6 +35,16 @@ private:
 	void updateChain();
 	bool confirmSender(int fd);
 
+	// P2P 
+	void handleQueryLatest(int fd);
+	void handleQueryAll(int fd);
+	void handleResponseBlockchain(int fd);
+	void handleQueryTransactionPool(int fd);
+	void handleResponseTransactionPool(int fd);
+
+	// Broadcasts
+	void broadcastTransactionPool();
+
 	// GET
 	void handleGetBlocks(int fd);
 	void handleGetPeers(int fd);

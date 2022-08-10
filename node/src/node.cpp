@@ -4,6 +4,7 @@
 #include "lan.hpp"
 #include "network_utils.hpp"
 #include "crypto.hpp"
+#include "bcl.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -213,18 +214,7 @@ void Node::handleBuffer(int fd, const std::string& buffer_contents) {
 	std::smatch matches;
 	std::regex_search(buffer_contents, matches, std::regex(R"~(\w+)~"));
 	// P2P Node Communication
-	if (matches[0] == "QUERY_LATEST") { 
-
-	} else if (matches[0] == "QUERY_ALL") {
-
-	} else if (matches[0] == "RESPONSE_BLOCKCHAIN") {
-
-	} else if (matches[0] == "QUERY_TRANSACTION_POOL") {
-
-	} else if (matches[0] == "RESPONSE_TRANSACTION_POOL") {
-	
-	// HTTP Communication
-	} else if (matches[0] == "GET" || matches[0] == "POST") { 
+	if (matches[0] == "GET" || matches[0] == "POST") { 
 		http::request request = network_utils::parse_http_request(buffer_contents);
 		std::cout << request.to_string() << std::endl;
 
@@ -258,8 +248,30 @@ void Node::handleBuffer(int fd, const std::string& buffer_contents) {
 				}
 				break;
 		}
-	} else { 
-		this->handleUnknownRequest(fd);
+	} else {
+		try {
+			P2P_Msg msg = json::parse(buffer_contents);
+			switch (msg.type) {
+				case P2P_Msg::MessageType::QUERY_ALL:
+					this->handleQueryAll(fd);
+					break;
+				case P2P_Msg::MessageType::QUERY_LATEST:
+					this->handleQueryLatest(fd);
+					break;
+				case P2P_Msg::MessageType::QUERY_TRANSACTION_POOL:
+					this->handleQueryTransactionPool(fd);
+					break;
+				case P2P_Msg::MessageType::RESPONSE_BLOCKCHAIN:
+					this->handleResponseBlockchain(fd);
+					break;
+				case P2P_Msg::MessageType::RESPONSE_TRANSACTION_POOL:
+					this->handleResponseTransactionPool(fd);
+					break;
+			}
+		} catch(json::parse_error& error) {
+			std::cerr << "Unknown request: " << buffer_contents << std::endl;
+			this->handleUnknownRequest(fd);
+		}
 	}
 }
 
@@ -278,25 +290,83 @@ Node::~Node() {
 // ======================================================
 // P2P Communication Handles
 // ======================================================
-// void Node::handleQueryLatest() {
+void Node::handleQueryLatest(int fd) {
 
-// }
+}
 
-// void Node::handleQueryAll() {
+void Node::handleQueryAll(int fd) {
+	// char message_buffer[SOCKET_BUFFER_SIZE];
+	
+	// // Write each block to the buffer
+	// for (const auto& block : this->blockchain->getBlockchain()) {
+	// 	std::string block_data = block.to_json();
+	// 	strcpy(message_buffer, block_data.c_str());
+		
+	// 	if (write(fd, message_buffer, block_data.size()) == -1) {
+	// 		perror("handleQueryAll: write");
+	// 		std::cerr << "Could not write the whole blockchain to the querying node" << std::endl;
+	// 	}
+	// }
+}
 
-// }
+void Node::handleResponseBlockchain(int fd) {
 
-// void Node::handleResponseBlockchain() {
+}
 
-// }
+void Node::handleQueryTransactionPool(int fd) {
 
-// void Node::handleQueryTransactionPool() {
+}
 
-// }
+void Node::handleResponseTransactionPool(int fd) {
+	std::vector<Transaction> received_pool;
+	char message_buffer[SOCKET_BUFFER_SIZE];
+	int num_bytes = 0;
+	std::smatch matches;
 
-// void Node::handleResponseTransactionPool() {
+	while (true) {
+		if ((num_bytes = read(fd, message_buffer, SOCKET_BUFFER_SIZE)) == -1) {
+			perror("handleResponseTransactionPool: read");
+			break;
+		}
+		message_buffer[num_bytes] = '\0';
 
-// }
+		try { 
+			P2P_Msg msg = json::parse(std::string(message_buffer));
+			if (msg.type != P2P_Msg::MessageType::RESPONSE_TRANSACTION_POOL) {
+				std::cerr << "Received the wrong P2P message" << std::endl;
+				break;
+			} else {
+				std::cout << msg.data << std::endl;
+			}
+		} catch(json::parse_error& error) {
+			return;
+		}
+	}
+}
+
+// ======================================================
+// P2P Broadcast
+// ======================================================
+void Node::broadcastTransactionPool() {
+	char message_buffer[SOCKET_BUFFER_SIZE];
+	P2P_Msg msg;
+	msg.type = P2P_Msg::MessageType::RESPONSE_TRANSACTION_POOL;
+
+	// This would be more efficient if I could launch a thread for 
+	// each node to write the transaction pool
+	for (int i = 1; i < MAX_CLIENTS; i++) {
+		int fd = this->pollfds[i].fd;
+		if (fd > 0) {
+			// Write the transaction pool
+			for (const auto& tx : this->blockchain->getTransactionPool()) {
+				msg.data = tx.to_json();
+				auto result = std::string(json(msg));
+				strcpy(message_buffer, result.c_str());
+				write(fd, message_buffer, result.size());
+			}
+		}
+	}
+}
 
 // ======================================================
 // HTTP GET Handles
@@ -453,11 +523,13 @@ void Node::handlePay(int fd, const json& j) {
 	}
 
 	std::string result;
+	bool success = false;
 	try {
 		std::string receiver = j.at("address").get<std::string>();
 		int amount = j.at("amount").get<int>();
 		if (this->blockchain->sendTransaction(this->pkey, receiver, amount)) {
 			result = http::response_200("Succesfully sent funds.").to_string();
+			success = true;
 		} else {
 			result = http::response_200("Unable to send funds.").to_string();
 		}
@@ -466,4 +538,6 @@ void Node::handlePay(int fd, const json& j) {
 	}
 	strcpy(message_buffer, result.c_str());
 	write(fd, message_buffer, result.size());
+
+	if (success) this->broadcastTransactionPool();
 }

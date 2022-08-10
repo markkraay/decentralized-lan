@@ -1,0 +1,3 @@
+Try and finish the transaction pool P2P communication and you will then understand the problems and fixes.
+
+JUST USE JSON!!!
