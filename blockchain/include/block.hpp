@@ -41,11 +41,11 @@ public:
 	bool hasValidTimestamp(const Block& previous);
 	bool hasValidHash();
 	bool isValidNewBlock(const Block& previous);
-	bool hashMatchesDifficulty();
+	static bool hashMatchesDifficulty(std::string hash, int difficulty);
 
 	// Hashers
 	std::string calculateHash();
-	static std::string Block::calculateHash(int index, const std::string& hash, int timestamp, const std::vector<Transaction>& transactions, int difficulty, int nonce) {
+	static std::string calculateHash(int index, const std::string& hash, int timestamp, const std::vector<Transaction>& transactions, int difficulty, int nonce);
 
 	json to_json() const;
 };

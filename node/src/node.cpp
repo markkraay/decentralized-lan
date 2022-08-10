@@ -50,8 +50,22 @@ Node::Node(const std::string& pkey_location, const std::string& blockchain_locat
 	} else {
 		std::cout << "Could not find a copy of the blockchain on disk... Creating a new one using the following genesis block: ";
 	}
-	std::cout << GENESIS_BLOCK.to_json() << std::endl;
-	this->blockchain = new Blockchain(GENESIS_BLOCK);
+
+	TxIn genesis_input{"", 0, ""};
+	TxOut genesis_output{crypto::getPublicKey(this->pkey), COINBASE_AMOUNT};
+	std::cout << crypto::getPublicKey(this->pkey) << std::endl;
+	Block genesis(
+		0, 
+		"91a73664bc84c0baa1fc75ea6e4aa6d1d20c5df664c724e3159aefc2e1186627", 
+		"", 
+		Block::getCurrentTimestamp(), 
+		{ Transaction({genesis_input}, {genesis_output})},
+		0,
+		0
+	);
+
+	std::cout << genesis.to_json() << std::endl;
+	this->blockchain = new Blockchain(genesis);
 	file.close();
 	this->updateChain();
 }
@@ -117,7 +131,7 @@ void Node::start() {
 
 	//  Try to connect to other node's on the network
 	int clients = 1; // The current number of clients (one because the server node)
-	std::pair<std::string, std::vector<int>> result = lan::connect_to_nodes(30);
+	std::pair<std::string, std::vector<int>> result = lan::connect_to_nodes(1);
 	this->sniffing_device = result.first;
 	auto nodes = result.second;
 	for (auto node : nodes) {
@@ -126,9 +140,10 @@ void Node::start() {
 		clients++;
 	}
 
+	this->is_serving = true;
 	char buffer[SOCKET_BUFFER_SIZE]; // For reading messages from the nodes
 	auto next = system_clock::now();
-	while (true) {
+	while (this->is_serving) {
 		if (system_clock::now() > next) {
 			std::cout << "====================================" << std::endl;
 			for (int i = 1; i < MAX_CLIENTS; i++) {
@@ -214,17 +229,15 @@ void Node::handleBuffer(int fd, const std::string& buffer_contents) {
 		std::cout << request.to_string() << std::endl;
 
 		switch (request.method) {
-			case http::request::GET:
+			case http::request::method::GET:
 				if (request.path == "/blocks") {
 					this->handleGetBlocks(fd);
 				} else if (request.path == "/peers") {
 					this->handleGetPeers(fd);
-				} else if (request.path == "/unspentTransactionOutputs") {
+				} else if (request.path == "/unspentTransactionOutputs") { // FIX
 					this->handleGetUnspentTransactionOutputs(fd, request.payload);
-				} else if (request.path == "/balance") {
+				} else if (request.path == "/balance") { // FIX
 					this->handleGetBalance(fd, request.payload);
-				} else if (request.path == "/mineBlock") {
-					this->handleMineBlock(fd);
 				} else if (request.path == "/address") {
 					this->handleGetAddress(fd);
 				} else if (request.path == "/transactionPool") {
@@ -235,8 +248,8 @@ void Node::handleBuffer(int fd, const std::string& buffer_contents) {
 					this->handleUnknownRequest(fd);
 				}
 				break;
-			case http::request::POST:
-				if (request.path == "/pay") {
+			case http::request::method::POST:
+				if (request.path == "/pay") { // FIX
 					this->handlePay(fd, request.payload);
 				} else if (request.path == "/mineBlock") {
 					this->handleMineBlock(fd);
@@ -255,7 +268,7 @@ from the network, closing socket connections with the other
 nodes.
 */
 void Node::terminate() {
-
+	this->is_serving = false;
 }
 
 Node::~Node() {
@@ -391,13 +404,12 @@ void Node::handleGetAddress(int fd) {
 
 void Node::handleGetTransactionPool(int fd) {
 	char message_buffer[SOCKET_BUFFER_SIZE];
-	std::string result;
 
 	json j;
-	j["address"] = this->blockchain->getTransactionPool();
+	j["transaction_pool"] = this->blockchain->getTransactionPool();
 	std::string body = j.dump();
 
-	auto result = http::response_200(body);
+	auto result = http::response_200(body).to_string();
 	strcpy(message_buffer, result.c_str());
 	write(fd, message_buffer, result.size());
 }
@@ -429,7 +441,7 @@ void Node::handleMineBlock(int fd) {
 		return;
 	}
 
-	this->blockchain->generateNextBlock();
+	this->blockchain->mineNextBlock();
 }
 
 void Node::handlePay(int fd, const json& j) {
@@ -440,14 +452,18 @@ void Node::handlePay(int fd, const json& j) {
 		return;
 	}
 
+	std::string result;
 	try {
 		std::string receiver = j.at("address").get<std::string>();
 		int amount = j.at("amount").get<int>();
-		// if (this->blockchain->sendTransaction(receiver, ))
-
+		if (this->blockchain->sendTransaction(this->pkey, receiver, amount)) {
+			result = http::response_200("Succesfully sent funds.").to_string();
+		} else {
+			result = http::response_200("Unable to send funds.").to_string();
+		}
 	} catch(json::exception error) {
-		auto result = http::response_500("Expection 'Content-Type': 'application/json' and '{'address': 'string', 'amount': int'}'").to_string();
-		strcpy(message_buffer, result.c_str());
-		write(fd, message_buffer, result.size());
+		result = http::response_500("Expection 'Content-Type': 'application/json' and '{'address': 'string', 'amount': int'}'").to_string();
 	}
+	strcpy(message_buffer, result.c_str());
+	write(fd, message_buffer, result.size());
 }

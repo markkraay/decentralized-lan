@@ -2,6 +2,9 @@
 
 #include "crypto.hpp"
 
+#include <chrono>
+#include <iostream>
+
 // ======================================================
 // Constructors
 // ======================================================
@@ -43,7 +46,6 @@ int Block::getCurrentTimestamp() {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 }
 
-
 json Block::to_json() const {
 	json j;
 	j["index"] = this->index;
@@ -60,14 +62,14 @@ json Block::to_json() const {
 // Validators
 // ======================================================
 bool Block::hasValidTimestamp(const Block& previous) {
-	return previous.getTimestamp() - 60 < this->timestamp && this->timestamp - 60 < Blockchain::getCurrentTimestamp;
+	return previous.getTimestamp() - 60 < this->timestamp && this->timestamp - 60 < Block::getCurrentTimestamp();
 }
 
 bool Block::hasValidHash() {
 	if (this->hash != this->calculateHash()) {
 		std::cerr << "hasValidHash: hash" << std::endl;
 		return false;
-	} else if (!this->hashMatchesDifficulty()) {
+	} else if (!Block::hashMatchesDifficulty(this->hash, this->difficulty)) {
 		std::cerr << "hasValidHash: difficulty" << std::endl;
 		return false;
 	}
@@ -84,17 +86,17 @@ bool Block::isValidNewBlock(const Block& previous) {
 	} else if (!this->hasValidTimestamp(previous)) {
 		std::cerr << "isValidNewBlock: timestamp" << std::endl;
 		return false;
-	} else if (!this->hashValidHash()) {
+	} else if (!this->hasValidHash()) {
 		std::cerr << "isValidNewBlock: timestamp" << std::endl;
 		return false;
 	}
 	return true;
 }
 
-bool Block::hashMatchesDifficulty() {
+bool Block::hashMatchesDifficulty(std::string hash, int difficulty) {
 	// Convert the hash to binary
 	std::string out = "";
-	for (char i : this->hash) {
+	for (char i : hash) {
 		uint8_t n;
     if(i <= '9' and i >= '0')
       n = i - '0';
@@ -104,7 +106,7 @@ bool Block::hashMatchesDifficulty() {
       out.push_back((n & (1<<j))? '1':'0');
 	}
 	// Check if the first 'difficult' characters are equalt to '0'
-	return (out.substr(0, this->difficulty)) == std::string('0', this->difficulty);
+	return out.substr(0, difficulty) == std::string(difficulty, '0');
 }
 
 // ======================================================

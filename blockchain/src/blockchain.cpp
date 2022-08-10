@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <optional>
 #include <chrono>
+#include <vector>
 
 // ======================================================
 // Constructors
@@ -19,11 +20,22 @@ Blockchain::Blockchain(std::vector<Block> blocks, std::vector<UnspentTxOut> tx_o
 
 Blockchain::Blockchain(const Block& genesis_block) {
 	this->blocks.push_back(genesis_block);
+	auto genesis_transaction = genesis_block.getData()[0];
+	auto genesis_tx_in = genesis_transaction.getTxIns()[0];
+	auto genesis_tx_out = genesis_transaction.getTxOuts()[0];
+
+	this->unspent_tx_outs.push_back(UnspentTxOut{ 
+		genesis_tx_in.tx_out_id, 
+		genesis_tx_in.tx_out_index,
+		genesis_tx_out.address,
+		genesis_tx_out.amount,
+	});
 }
 
 Blockchain::Blockchain(const json& j) {
 	this->blocks = j.at("blocks").get<std::vector<Block>>();
 	this->unspent_tx_outs = j.at("unspent_tx_outs").get<std::vector<UnspentTxOut>>();
+	this->transaction_pool = j.at("transaction_pool").get<std::vector<Transaction>>();
 }
 
 // ======================================================
@@ -53,12 +65,11 @@ int Blockchain::getBalance(const std::string& address) const {
 	return total;
 }
 
-
-
 json Blockchain::to_json() const {
 	json j;
 	j["blocks"] = this->blocks;
 	j["unspent_tx_outs"] = this->unspent_tx_outs;
+	j["transaction_pool"] = this->transaction_pool;
 	return j;
 }
 
@@ -106,59 +117,62 @@ int Blockchain::getAdjustedDifficulty() {
 // ======================================================
 bool Blockchain::isValidChain() {
 	for (int i = 1; i < blocks.size(); i++) {
-		if (!isValidNewBlock(blocks.at(i), blocks.at(i - 1))) {
+		if (blocks[i].isValidNewBlock(blocks[i - 1])) {
+			std::cerr << "isValidChain: isValidNewBlock" << std::endl;
 			return false;
 		}
 	}
 	return true;
 }
 
-bool Blockchain::validateTransaction(const Transaction& tx) {
-	for (auto& tx_in : tx.getTxIns()) {
-		if (!validateTxIn(tx_in)) {
-			std::cerr << "validateTransaction: invalid tx_in" << std::endl;
-			return false;
-		}
-	}
+// bool Blockchain::validateTransaction(const Transaction& tx) {
+// 	for (auto& tx_in : tx.getTxIns()) {
+// 		if (!this->validateTxIn(tx_in)) {
+// 			std::cerr << "validateTransaction: invalid tx_in" << std::endl;
+// 			return false;
+// 		}
+// 	}
 
-	std::optional<UnspentTxOut> getTxInAmount([this->unspent_tx_outs](const TxIn& tx_in) {
-		for (auto& u_tx_out : unspent_tx_outs) {
-			if (u_tx_out.tx_out_id == tx_in.tx_out_id && u_tx_out.tx_out_index == tx_in.tx_out_index) return u_tx_out;
-		}
-	});
+// 	std::optional<UnspentTxOut> getTxInAmount([this->unspent_tx_outs](const TxIn& tx_in) {
+// 		for (auto& u_tx_out : unspent_tx_outs) {
+// 			if (u_tx_out.tx_out_id == tx_in.tx_out_id && u_tx_out.tx_out_index == tx_in.tx_out_index) return u_tx_out;
+// 		}
+// 	});
 
-	int tx_in_amt = 0;
-	for (auto& tx_in : tx.getTxIns()) {
-		auto amount = getTxInAmount(tx_in);
-		if (amount.has_value()) {
-			tx_in_amt += amount.value();
-		}
-	}
+// 	int tx_in_amt = 0;
+// 	for (auto& tx_in : tx.getTxIns()) {
+// 		auto amount = getTxInAmount(tx_in);
+// 		if (amount.has_value()) {
+// 			tx_in_amt += amount.value();
+// 		}
+// 	}
 
-	int tx_out_amt = 0;
-	for (auto& tx_out : tx.getTxOuts()) {
-		tx_out_amt += tx_out.amount;
-	}
+// 	int tx_out_amt = 0;
+// 	for (auto& tx_out : tx.getTxOuts()) {
+// 		tx_out_amt += tx_out.amount;
+// 	}
 
-	if (tx_in_amt != tx_out_amt) {
-		std::cerr << "validateTransaction: outs do not match ins" << std::endl;
-		return false;
-	}
+// 	if (tx_in_amt != tx_out_amt) {
+// 		std::cerr << "validateTransaction: outs do not match ins" << std::endl;
+// 		return false;
+// 	}
 
-	return true;
-}
+// 	return true;
+// }
 
 // Checks if any of the tx_ins in the transaction being processed are already present
 // within the pool
 bool Blockchain::isValidTxForPool(const Transaction& tx) {
+	// Obtain the transaction pool's inputs
 	std::vector<TxIn> ins;
 	for (auto& transaction : this->transaction_pool) {
-		for (auto& in : transaction->getTxIns()) {
+		for (auto& in : transaction.getTxIns()) {
 			ins.push_back(in);
 		}
 	}
 
-	for (auto& in : tx->getTxIns()) {
+	// Is one of the transaction's input stored in the transaction pool?
+	for (auto& in : tx.getTxIns()) {
 		for (auto& pool_in : ins) {
 			if (in.tx_out_id == pool_in.tx_out_id && in.tx_out_index == pool_in.tx_out_index) {
 				std::cerr << "isValidTxForPool: input already found in pool" << std::endl;
@@ -171,11 +185,7 @@ bool Blockchain::isValidTxForPool(const Transaction& tx) {
 }
 
 bool Blockchain::validateTxIn(const TxIn& tx_in) {
-	UnspentTxOut *referenced = nullptr;
-	for (auto& u_tx_out : this->unspent_tx_outs) {
-		if (u_tx_out.tx_out_id == tx_in.tx_out_id && u_tx_out.tx_out_index == tx_in.tx_out_index) referenced = u_tx_out;
-	}
-
+	auto referenced = this->findReferencedUnspentTxOut(tx_in);
 	if (referenced == nullptr) {
 		std::cerr << "validateTxIn: referenced tx_out could not be found." << std::endl;
 		return false;
@@ -196,12 +206,10 @@ bool Blockchain::validateTxIn(const TxIn& tx_in) {
 // Blockchain Editing Functions
 // ======================================================
 void Blockchain::mineNextBlock() {
-	if (this->transaction_pool.size() == 0) return; // There's no need to mine a block
-
 	auto previous_block = this->getLatestBlock();
 	auto difficulty = this->getDifficulty();
 	auto next_index = previous_block.getIndex() + 1;
-	auto next_timestamp = getCurrentTimestamp();
+	auto next_timestamp = Block::getCurrentTimestamp();
 	auto new_block = findBlock(next_index, previous_block.getHash(), next_timestamp, this->transaction_pool, difficulty);
 	this->blocks.push_back(new_block);
 }
@@ -209,65 +217,109 @@ void Blockchain::mineNextBlock() {
 bool Blockchain::sendTransaction(EVP_PKEY* pkey, const std::string& receiver, int amount) {
 	// Creating Transaction
 	auto sender_address = crypto::getPublicKey(pkey);
-	auto unspent = this->getUnspentTxOutsGivenAddress(sender_address);
+	std::vector<TxIn> unsigned_tx_ins;
+	int left_over_amount = 0;
 
-	// Not sure what this does
-  // const myUnspentTxOuts = filterTxPoolTxs(myUnspentTxOutsA, txPool);
+	{
+		auto unspent = this->getUnspentTxOutsGivenAddress(sender_address);
 
-	auto pairs = findTxOutsForAmount(unspent, amount);
-	if (pairs.has_value()) {
-		auto tx_outs = pairs.value().first;
-		auto left_over = pairs.value().second;
+		// Filter the unspent transaction outputs that are already being used as inputs in the transaction pool
+		unspent.erase(std::remove_if(unspent.begin(), unspent.end(), [&](const UnspentTxOut& u_tx_out) {
+			for (auto& tx : this->transaction_pool) {
+				for (auto& tx_in : tx.getTxIns()) {
+					if (tx_in.tx_out_id == u_tx_out.tx_out_id && tx_in.tx_out_index == u_tx_out.tx_out_index) return true;
+				}
+			}
+			return false;
+ 	  }), unspent.end());
 
-		std::vector<TxIn> tx_ins;
-		for (auto tx_out : tx_outs) {
-			tx_ins.push_back(TxIn { tx_out.tx_out_id, tx_out.tx_out_index, crypto::signWithECDSA });
+		// Find the unspent transaction outputs which we will include as inputs in the transaction
+		int current_amount = 0;
+		for (auto& u_tx_out : unspent) {
+			unsigned_tx_ins.push_back(TxIn { u_tx_out.tx_out_id, u_tx_out.tx_out_index, "" });
+			current_amount += u_tx_out.amount;
+			if (current_amount > amount) {
+				left_over_amount = amount - current_amount;
+			}
 		}
 
-		Transaction tx(tx_ins, tx_outs);
-		return this->addToTransactionPool(tx);
+		if (current_amount < amount) return false; // Not able to complete the transaction
 	}
-	return false;
+
+	// Create the transaction
+	std::vector<TxOut> outs = {TxOut { receiver, amount }};
+	if (left_over_amount > 0) outs.push_back(TxOut { sender_address, left_over_amount });
+
+	Transaction tx(
+		unsigned_tx_ins,
+		outs
+	);
+
+	// Sign the transaction inputs
+	tx.signTxIns([this, pkey, &tx](TxIn tx_in) {
+		auto dataToSign = tx.getId();
+		auto referenced = this->findReferencedUnspentTxOut(tx_in);
+		if (referenced == nullptr) {
+			throw std::invalid_argument("signTxIns: Could not find referenced tx_in");
+		}
+		std::string ref_address = referenced->address;
+		if (crypto::getPublicKey(pkey) != ref_address) {
+			throw std::invalid_argument("signTxIns: Sender address did not match referenced");
+		}
+		tx_in.signature = crypto::signWithECDSA(dataToSign, pkey);
+		return tx_in;
+	});
 }
 
-bool Blockchain::addToTransactionPool(const Transaction& tx) => {
-    if (!this->isValidTransaction(tx)) {
-			std::cerr << "addToTransactionPool: validate transaction" << st::endl;
-			return false;
-    }
+// bool Blockchain::processTransactions(const std::vector<Transaction>& txs, const std::vector<UnspentTxOut>& u_tx_outs, int block_index) {
+// 	// Validate block transactions
 
-    if (!this->isValidTxForPool(tx)) {
-			std::cerr << "addToTransactionPool: valid tx for pool" << st::endl;
-			return false;
-    }
+// 	// Check for duplicate txIns.
+// 	std::vector<TxIn> tx_ins;
+// 	for (const auto& tx : txs) {
+// 		for (const auto& tx_in : tx.getTxIns()) {
+// 			for (const auto& seen : tx_ins) {
+// 				if (seen.tx_out_id == tx_in.tx_out_id && seen.tx_out_index == seen.tx_out_index) return false;
+// 				else tx_ins.push_back(tx_in);
+// 			}
+// 		}
+// 	}
+// }
 
-    this->transaction_pool.push(tx);
-		return true;
-};
+
+// bool Blockchain::addToTransactionPool(const Transaction& tx) => {
+//     if (!this->isValidTransaction(tx)) {
+// 			std::cerr << "addToTransactionPool: validate transaction" << st::endl;
+// 			return false;
+//     }
+
+//     if (!this->isValidTxForPool(tx)) {
+// 			std::cerr << "addToTransactionPool: valid tx for pool" << st::endl;
+// 			return false;
+//     }
+
+//     this->transaction_pool.push(tx);
+// 		return true;
+// };
 
 // ======================================================
 // Helpers Functions
 // ======================================================
-std::optional<std::pair<std::vector<UnspentTxOut>, int>> findTxOutsForAmount(int amount, const std::vector<UnspentTxOut>& u_tx_outs) {
-	int current_amount = 0;
-	std::vector<UnspentTxOut> included;
-	for (auto u_tx_out : u_tx_outs) {
-		included.push_back(u_tx_out);
-		current_amount += u_tx_out.amount;
-		if (current_amount >= amount) {
-			int left_over_amount = current_amount - amount;
-			return std::make_pair(included, left_over_amount);
-		}
-	}
-}
-
-Block findBlock(int index, const std::string& previous_hash, int timestamp, const std::vector<Transaction>& transactions, int difficulty) {
+Block Blockchain::findBlock(int index, const std::string& previous_hash, int timestamp, const std::vector<Transaction>& txs, int difficulty) {
 	int nonce = 0;
 	while (true) {
-		std::string hash = calculateHash(index, previous_hash, timestamp, transactions, difficulty, nonce);
-		if (hashMatchesDifficulty(hash, difficulty)) {
-			return Block(index, hash, previous_hash, timestamp, transactions, difficulty, nonce);
+		std::string hash = Block::calculateHash(index, previous_hash, timestamp, txs, difficulty, nonce);
+		if (Block::hashMatchesDifficulty(hash, difficulty)) {
+			return Block(index, hash, previous_hash, timestamp, txs, difficulty, nonce);
 		}
 		nonce++;
 	}
+}
+
+UnspentTxOut* Blockchain::findReferencedUnspentTxOut(const TxIn& tx_in) {
+	UnspentTxOut *referenced = nullptr;
+	for (auto& u_tx_out : this->unspent_tx_outs) {
+		if (u_tx_out.tx_out_id == tx_in.tx_out_id && u_tx_out.tx_out_index == tx_in.tx_out_index) referenced = &u_tx_out;
+	}
+	return referenced;
 }

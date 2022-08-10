@@ -30,6 +30,10 @@ Transaction::Transaction(const json& j) : Transaction(
 // ======================================================
 // Getters
 // ======================================================
+std::string Transaction::getId() const { return this->id; }
+std::vector<TxIn> Transaction::getTxIns() const { return this->tx_ins; }
+std::vector<TxOut> Transaction::getTxOuts() const { return this->tx_outs; }
+
 json Transaction::to_json() const {
 	json j;
 	j["id"] = this->id;
@@ -60,4 +64,11 @@ bool Transaction::validateTxIn(TxIn tx_in, const std::vector<UnspentTxOut>& u_tx
 	// }
 
 	return true;
+}
+
+// ======================================================
+// Signer
+// ======================================================
+void Transaction::signTxIns(std::function<TxIn(TxIn)> signer) {
+	std::for_each(this->tx_ins.begin(), this->tx_ins.end(), signer);
 }

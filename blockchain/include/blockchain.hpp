@@ -30,11 +30,15 @@ protected:
 	// Validators
 	bool isValidChain(); 
 	bool isValidTransaction(const Transaction& tx);
-	bool validateTxIn(const TxIn& tx_in)
 	bool isValidTxForPool(const Transaction& tx);
+	bool validateTxIn(const TxIn& tx_in);
 
 	// Blockchain editors
 	bool addTransactionToPool(const Transaction& tx);
+
+	// Helpers
+	UnspentTxOut* findReferencedUnspentTxOut(const TxIn& tx_in);
+	Block findBlock(int index, const std::string& previous_hash, int timestamp, const std::vector<Transaction>& txs, int difficulty);
 
 public:
 	Blockchain();

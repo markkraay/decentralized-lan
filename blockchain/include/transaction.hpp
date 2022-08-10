@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <functional>
 #include <vector>
 #include <string>
 
@@ -35,8 +36,8 @@ struct UnspentTxOut {
 
 class Transaction {
 	std::string id;
-	std::vector<TxIn> tx_ins;
 	std::vector<TxOut> tx_outs;
+	std::vector<TxIn> tx_ins;
 
 public:
 	Transaction();
@@ -46,8 +47,10 @@ public:
 	json to_json() const;
 
 	bool validateTxIn(TxIn tx_in, const std::vector<UnspentTxOut>& u_tx_outs);
+	std::string getId() const;
 	std::vector<TxIn> getTxIns() const;
 	std::vector<TxOut> getTxOuts() const;
+	void signTxIns(std::function<TxIn(TxIn)> signer);
 };
 
 // ======================================================

@@ -5,6 +5,7 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
+#include <vector>
 #include <string>
 #include <memory>
 #include <iostream>
@@ -142,19 +143,22 @@ bool crypto::verifyWithECDSA(const std::string& digest, const std::string& signa
 }
 
 std::string crypto::getPublicKey(EVP_PKEY *pkey) {
-	// Get the size of the public key.
 	size_t len;
 	if (EVP_PKEY_get_raw_private_key(pkey, NULL, &len) <= 0) {
+		std::cerr << "getPublicKey: get_raw_private_pkey size" << std::endl;
+		exit(EXIT_FAILURE);
 	}
 
 	// Memory malloced for reading the key.
 	auto public_key_ptr = (unsigned char*)malloc(sizeof(unsigned char) * len);
 	if (EVP_PKEY_get_raw_public_key(pkey, public_key_ptr, &len) <= 0) {
+		std::cerr << "getPublicKey: get_raw_private_pkey size" << std::endl;
+		exit(EXIT_FAILURE);
 	}
 
 	std::string key(reinterpret_cast<char*>(public_key_ptr));
 	free(public_key_ptr);
-	return key;
+	return crypto::SHA256(key);
 }
 
 void crypto::freeECDSAPrivateKey(EVP_PKEY *pkey) {

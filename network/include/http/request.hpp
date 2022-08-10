@@ -8,8 +8,8 @@ namespace http {
 	// Outlines the anatomy of an HTTP request
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Messages
 
-	typedef struct {
-		enum method {
+	struct request {
+		enum class method {
 			GET, 
 			POST
 		};
@@ -21,15 +21,15 @@ namespace http {
 		inline std::string to_string() {
 			std::string result = "";
 			switch(this->method) {
-				case GET:
+				case method::GET:
 					result += "GET ";
 					break;
-				case POST:
+				case method::POST:
 					result += "POST ";
 					break;
 			}
 			result += "Path: " + path + "\nPayload: " + payload.dump() + '\n';
 			return result;
 		}
-	} request;
+	};
 }
