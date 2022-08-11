@@ -551,6 +551,7 @@ void Node::handlePay(int fd, const json& j) {
 	}
 	strcpy(message_buffer, result.c_str());
 	write(fd, message_buffer, result.size());
+	close(fd); // So that we do not broadcast the transaction pool to this fd.
 
 	if (success) this->broadcastTransactionPool();
 }
