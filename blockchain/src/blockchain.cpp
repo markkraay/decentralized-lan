@@ -113,6 +113,11 @@ int Blockchain::getAdjustedDifficulty() {
 }
 
 // ======================================================
+// Public Setters
+// ======================================================
+void Blockchain::setTransactionPool(const std::vector<Transaction>& txs) { this->transaction_pool = txs; }
+
+// ======================================================
 // Validation Functions
 // ======================================================
 bool Blockchain::isValidChain() {

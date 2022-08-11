@@ -132,7 +132,7 @@ void Node::start() {
 
 	//  Try to connect to other node's on the network
 	int clients = 1; // The current number of clients (one because the server node)
-	std::pair<std::string, std::vector<int>> result = lan::connect_to_nodes(1);
+	std::pair<std::string, std::vector<int>> result = lan::connect_to_nodes(30);
 	this->sniffing_device = result.first;
 	auto nodes = result.second;
 	for (auto node : nodes) {
@@ -154,14 +154,15 @@ void Node::start() {
 			}
 
 			// Send a message to each socket
-			for (int i = 1; i < MAX_CLIENTS; i++) {
-				char *message = "Hello";
-				if (pollfds[i].fd > 0) {
-					if(send(pollfds[i].fd, message, sizeof(message), 0) == -1) {
-						perror("send: ");
-					}
-				}
-		}
+			// for (int i = 1; i < MAX_CLIENTS; i++) {
+			// 	char *message = "Hello";
+			// 	if (pollfds[i].fd > 0) {
+			// 		if(send(pollfds[i].fd, message, sizeof(message), 0) == -1) {
+			// 			perror("send: ");
+			// 		}
+			// 	}
+			// }
+
 			next = system_clock::now() + seconds(30);
 		}
 
@@ -174,6 +175,8 @@ void Node::start() {
 				int addrlen = sizeof(cliaddr);
 				int client_socket = accept(this->node_fd, (struct sockaddr *)&cliaddr, (socklen_t *)&addrlen);
 				std::cout << "Accepted connection from: " << network_utils::resolve_fd(client_socket) << std::endl;
+				// Upon connection, synchronize the blockchain between the two nodes. 
+
 				/* Adds the new connection into the first available slot in "pollfds"
 				Because the for loop searches for the first slot with a fd == 0, 
 				Whenever a client disconnects, their slot will be filled.
@@ -199,6 +202,7 @@ void Node::start() {
 					} else {
 						buffer[bufSize] = '\0';
 						std::cout << "Received data from " << network_utils::resolve_fd(pollfds[i].fd) << ". Resolving..." << std::endl;
+						std::cout << std::string(buffer) << std::endl;
 						this->handleBuffer(pollfds[i].fd, std::string(buffer));
 					}
 					pollfds[i].revents = 0; // Zero out the revents so they arn't handled again.
@@ -287,6 +291,13 @@ Node::~Node() {
 	crypto::freeECDSAPrivateKey(this->pkey);
 }
 
+// Synchronizes the blockchain between the active node and the previously connected node
+// void Node::synchronize(int fd) {
+// 	// First, read the blockchain from the connected node.
+
+
+// }
+
 // ======================================================
 // P2P Communication Handles
 // ======================================================
@@ -342,6 +353,8 @@ void Node::handleResponseTransactionPool(int fd) {
 			return;
 		}
 	}
+
+	this->blockchain->setTransactionPool(received_pool);
 }
 
 // ======================================================

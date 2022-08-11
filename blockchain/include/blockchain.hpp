@@ -55,6 +55,8 @@ public:
 	void mineNextBlock();
 	bool sendTransaction(EVP_PKEY* pkey, const std::string& receiver, int amount);
 
+	void setTransactionPool(const std::vector<Transaction>& txs);
+
 	json to_json() const;
 };
 

@@ -1,3 +1,14 @@
 Try and finish the transaction pool P2P communication and you will then understand the problems and fixes.
 
-JUST USE JSON!!!
+When does the blockchain need to be synchronized?
+Answer: Whenever there is a change in it's state
+
+Hypothetical Scenario:
+
+Node0 sends a transaction, creating some unspent transaction outputs for Node1.
+
+This transaction must be propgated throughout the network. 
+
+What happens if this transaction conflicts with the state of another node?
+For example, Node0 uses unspentTxOuts that were already spent in Node1? How 
+do we determine which node is correct?
