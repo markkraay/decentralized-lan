@@ -152,17 +152,6 @@ void Node::start() {
 					std::cout << network_utils::resolve_fd(fd) << std::endl;
 				}
 			}
-
-			// Send a message to each socket
-			// for (int i = 1; i < MAX_CLIENTS; i++) {
-			// 	char *message = "Hello";
-			// 	if (pollfds[i].fd > 0) {
-			// 		if(send(pollfds[i].fd, message, sizeof(message), 0) == -1) {
-			// 			perror("send: ");
-			// 		}
-			// 	}
-			// }
-
 			next = system_clock::now() + seconds(30);
 		}
 
@@ -193,17 +182,17 @@ void Node::start() {
 			}
 			// Processing events from the connected nodes.
 			for (int i = 1; i < MAX_CLIENTS; i++) {
-				if (pollfds[i].fd > 0 && pollfds[i].revents & POLLIN) {
-					int bufSize = read(pollfds[i].fd, buffer, sizeof(buffer));
+				int fd = pollfds[i].fd;
+				if (fd > 0 && pollfds[i].revents & POLLIN) {
+					int bufSize = read(fd, buffer, sizeof(buffer));
 					if (bufSize == -1 || bufSize == 0) { // Reading from the socket failed.
 						pollfds[i].fd = 0;
 						pollfds[i].events = 0;
 						clients--;
 					} else {
 						buffer[bufSize] = '\0';
-						std::cout << "Received data from " << network_utils::resolve_fd(pollfds[i].fd) << ". Resolving..." << std::endl;
-						std::cout << std::string(buffer) << std::endl;
-						this->handleBuffer(pollfds[i].fd, std::string(buffer));
+						std::cout << "Received data from " << network_utils::resolve_fd(fd) << ". Resolving..." << std::endl;
+						this->handleBuffer(fd, std::string(buffer));
 					}
 					pollfds[i].revents = 0; // Zero out the revents so they arn't handled again.
 				}
@@ -254,7 +243,10 @@ void Node::handleBuffer(int fd, const std::string& buffer_contents) {
 		}
 	} else {
 		try {
-			P2P_Msg msg = json::parse(buffer_contents);
+			json j = json::parse(buffer_contents);
+			std::cout << j << std::endl;
+			P2P_Msg msg = j;
+
 			switch (msg.type) {
 				case P2P_Msg::MessageType::QUERY_ALL:
 					this->handleQueryAll(fd);
@@ -274,7 +266,6 @@ void Node::handleBuffer(int fd, const std::string& buffer_contents) {
 			}
 		} catch(json::parse_error& error) {
 			std::cerr << "Unknown request: " << buffer_contents << std::endl;
-			this->handleUnknownRequest(fd);
 		}
 	}
 }
