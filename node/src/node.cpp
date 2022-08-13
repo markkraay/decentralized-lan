@@ -147,8 +147,9 @@ void Node::start() {
 		if (system_clock::now() > next) {
 			std::cout << "====================================" << std::endl;
 			for (int i = 1; i < MAX_CLIENTS; i++) {
-				if (pollfds[i].fd > 0) {
-					std::cout << network_utils::resolve_fd(pollfds[i].fd) << std::endl;
+				int fd = pollfds[i].fd;
+				if (fd > 0) {
+					std::cout << network_utils::resolve_fd(fd) << std::endl;
 				}
 			}
 
@@ -328,6 +329,7 @@ void Node::handleQueryTransactionPool(int fd) {
 }
 
 void Node::handleResponseTransactionPool(int fd) {
+	std::cout << "Received transaction pool" << std::endl;
 	std::vector<Transaction> received_pool;
 	char message_buffer[SOCKET_BUFFER_SIZE];
 	int num_bytes = 0;
@@ -349,6 +351,7 @@ void Node::handleResponseTransactionPool(int fd) {
 				std::cout << msg.data << std::endl;
 			}
 		} catch(json::parse_error& error) {
+			std::cerr << "Transaction pool parse error" << std::endl;
 			return;
 		}
 	}
@@ -369,10 +372,12 @@ void Node::broadcastTransactionPool() {
 	for (int i = 1; i < MAX_CLIENTS; i++) {
 		int fd = this->pollfds[i].fd;
 		if (fd > 0) {
+			std::cout << "Sending transaction pool to " << network_utils::resolve_fd(fd) << std::endl;
 			// Write the transaction pool
 			for (const auto& tx : this->blockchain->getTransactionPool()) {
 				msg.data = tx.to_json();
 				auto result = std::string(json(msg));
+				std::cout << result << std::endl;
 				strcpy(message_buffer, result.c_str());
 				write(fd, message_buffer, result.size());
 			}

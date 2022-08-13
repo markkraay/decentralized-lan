@@ -71,9 +71,9 @@ std::string network_utils::resolve_fd(int fd) {
 	struct sockaddr_in addr;
 	socklen_t len = sizeof(addr);
 	if (getpeername(fd, (struct sockaddr *)&addr, &len) == -1) {
-		perror("resolve_fd: ");
-		exit(EXIT_FAILURE);
+		return "Could not read IP address for file descriptor";
 	}
+
 	return inet_ntoa(addr.sin_addr);
 }
 
