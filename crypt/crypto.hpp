@@ -1,16 +1,18 @@
 #pragma once
 
-#include <openssl/evp.h>
+#include <openssl/ec.h>
 
 #include <string>
 
 namespace crypto {
 	std::string SHA256(const std::string& to_be_hashed);
-	EVP_PKEY* createECDSAPrivateKey(const std::string& location);
-	EVP_PKEY* loadECDSAPrivateKey(const std::string& location);
-	EVP_PKEY* initializeECDSAPrivateKey(const std::string& location);
-	std::string signWithECDSA(const std::string& data, EVP_PKEY* pkey);
-	bool verifyWithECDSA(const std::string& digest, const std::string& sigature, EVP_PKEY* pkey);
-	std::string getPublicKey(EVP_PKEY *pkey);
-	void freeECDSAPrivateKey(EVP_PKEY *pkey);
+	EC_KEY* createECDSAPrivateKey(const std::string& location);
+	EC_KEY* loadECDSAPrivateKey(const std::string& location);
+	EC_KEY* initializeECDSAPrivateKey(const std::string& location);
+	std::string signWithECDSA(const std::string& data, EC_KEY* pkey);
+	bool verifyWithECDSA(const std::string& digest, const std::string& b64_sigature, EC_KEY* pkey);
+	std::string getPublicKey(EC_KEY*pkey);
+	void freeECDSAPrivateKey(EC_KEY*pkey);
+	std::string Base64Encode(const std::string& buffer);
+	std::string Base64Decode(const std::string& b64_input);
 }

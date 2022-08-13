@@ -54,7 +54,6 @@ Node::Node(const std::string& pkey_location, const std::string& blockchain_locat
 
 	TxIn genesis_input{"", 0, ""};
 	TxOut genesis_output{crypto::getPublicKey(this->pkey), COINBASE_AMOUNT};
-	std::cout << crypto::getPublicKey(this->pkey) << std::endl;
 	Block genesis(
 		0, 
 		"91a73664bc84c0baa1fc75ea6e4aa6d1d20c5df664c724e3159aefc2e1186627", 

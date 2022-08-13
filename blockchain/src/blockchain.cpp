@@ -219,7 +219,7 @@ void Blockchain::mineNextBlock() {
 	this->blocks.push_back(new_block);
 }
 
-bool Blockchain::sendTransaction(EVP_PKEY* pkey, const std::string& receiver, int amount) {
+bool Blockchain::sendTransaction(EC_KEY* pkey, const std::string& receiver, int amount) {
 	// Creating Transaction
 	auto sender_address = crypto::getPublicKey(pkey);
 	std::vector<TxIn> unsigned_tx_ins;

@@ -53,7 +53,7 @@ public:
 	int getBalance(const std::string& address) const;
 
 	void mineNextBlock();
-	bool sendTransaction(EVP_PKEY* pkey, const std::string& receiver, int amount);
+	bool sendTransaction(EC_KEY* pkey, const std::string& receiver, int amount);
 
 	void setTransactionPool(const std::vector<Transaction>& txs);
 

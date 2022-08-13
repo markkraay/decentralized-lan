@@ -15,21 +15,4 @@ do we determine which node is correct?
 
 -------------------------------------------------------------------------------
 Debugging Takeaways:
-left_over_amount is incorrectly calculated. I had a result of -40 when it should have been 40
-
-ECDSA Problem: The curve that we are using does not support verification
-A -2 result is returned upon EVP_PKEY_sign_init, denoting a problem with the
-chosen ECDSA algorithm.
-
-This is difficult because I cannot find a combination that supports verifaction 
-and obtaining the public key
-
-Few different approaches here...
-1) Creating private EC key, signing, and verifying is documented well for using 
-openssl cli. So I could go that route
-2) Keep searching for a solution. This seems unlikely to stumble upon considering 
-I've been looking for hours and many of the solutions are non-sequitors
-3) Learn some about ECDSA and try to implement my own solution
-
-In the meantime, ignore the signature step, leaving each signature blank and see
-if we can synchronize the nodes.
+BUG_ENCOUNTERED: left_over_amount is incorrectly calculated. I had a result of -40 when it should have been 40

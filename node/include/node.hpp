@@ -21,7 +21,7 @@ are written in a special communication language.
 */ 
 class Node {
 private:
-	EVP_PKEY *pkey;
+	EC_KEY *pkey;
 	std::string pkey_location;
 	Blockchain *blockchain;
 	std::string blockchain_location;
